@@ -1,4 +1,4 @@
-# Draft post (step 5): a fake document fooled my agent 3 times out of 3
+# Draft post 2 (after step 5): a fake document fooled my agent 3 times out of 3
 
 *Draft. Numbers from 3 October 2026.*
 

@@ -45,8 +45,8 @@ All numbers come from the eval suite (`make evals`) on simulated scenes with kno
 
 | What | Result |
 | --- | --- |
-| Targets detected | people and cars 97 to 100% of frames; the drone-like target 93 to 98% (its rotors raise the background) |
-| False tracks | none in most runs, at most 0.03 per frame |
+| Targets detected | people and cars 97 to 100% of frames; the drone-like target 93 to 100% (its rotors raise the background) |
+| False tracks | none on the crossing scene, at most 0.03 per frame on the default scene |
 | Track ID switches | none between two people passing within 3 m; a drone flying over a car can break its track, and the agent's tools stitch the pieces back |
 | Position error (RMS) | people and cars at most 0.5 m, the drone about 1 m |
 | Cars at their real size (4.5 m) | one track per car, from the echoes along its body; a drone flying low over a real-size car is a known limit |
@@ -114,6 +114,7 @@ Evals that need a model or the database skip when those are not running (as in C
 | `src/upchirp/sim/` | Radar simulator with ground truth | Tarik |
 | `src/upchirp/sources/` | Frame source adapters (sim, replay, sound card, FPGA) | Tarik |
 | `src/upchirp/dsp/` | Clutter map, CFAR, tracker, FPGA test vectors | Tarik |
+| `src/upchirp/classify/` | Labels (RCS rules, optional ONNX classifier) | Tarik |
 | `src/upchirp/api/` | FastAPI, WebSockets, public-mode limits | Tarik |
 | `src/upchirp/agent/` | MCP server, LangGraph agent, answer checks, benchmark | Tarik |
 | `evals/`, `tests/` | Eval suite and unit tests | Tarik |

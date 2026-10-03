@@ -1,4 +1,4 @@
-# Draft post 3 (after step 8): three people installed it from my guide
+# Draft post 4 (after step 8): three people installed it from my guide
 
 *Outline only. Write it after the install test.*
 

@@ -34,7 +34,7 @@ Open them in a browser on the same computer or on any computer on the same netwo
 
 **Is it working?** Open the live view. The badge at the top right should say **live** in green, and dots should move on the map. Until real radar hardware is connected, the system plays back simulated recordings in a loop: two people, a car and a drone-like target.
 
-**Asking questions.** Type into the chat box, for example "How many drone-like tracks crossed in the last 10 minutes, and which came closest?" Answers come only from what the radar recorded and take about half a minute. The system never changes radar settings unless you ask it to, and even then it asks you to approve first.
+**Asking questions.** Type into the chat box, for example "How many drone-like tracks crossed in the last 10 minutes, and which came closest?" Answers come only from what the radar recorded and take about 15 to 30 seconds. The system never changes radar settings unless you ask it to, and even then it asks you to approve first.
 
 **Something looks wrong.**
 
@@ -50,8 +50,8 @@ Open them in a browser on the same computer or on any computer on the same netwo
 ## For engineers
 
 - Status: `sudo k3s kubectl get pods -n upchirp`. Every pod should be `Running`, and `upchirp-seed` should be `Completed`.
-- Logs: `sudo k3s kubectl logs -n upchirp deploy/upchirp-api` (or `upchirp-process`, `upchirp-write`, `upchirp-source`, `ollama`, `db`, `redpanda`).
+- Logs: `sudo k3s kubectl logs -n upchirp deploy/upchirp-api` (or `upchirp-process`, `upchirp-write`, `upchirp-source`, `upchirp-alerts`, `ollama`), and `statefulset/db` or `statefulset/redpanda`.
 - Remove everything: `sudo ./uninstall.sh`. This deletes the recordings and the database too.
 - Building a new bundle (needs the internet): `deploy/bundle/build.sh` in the repository.
 
-What runs: k3s (a small Kubernetes) with Redpanda, PostgreSQL (TimescaleDB and pgvector), Ollama with the local models, the four Upchirp services (source, processor, writer, API with the UI), Prometheus and Grafana. All images ship in the bundle; nothing is downloaded at install time or later.
+What runs: k3s (a small Kubernetes) with Redpanda, PostgreSQL (TimescaleDB and pgvector), Ollama with the local models, the five Upchirp services (source, processor, writer, alerts, API with the UI), Prometheus and Grafana. All images ship in the bundle; nothing is downloaded at install time or later.

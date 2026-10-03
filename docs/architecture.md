@@ -2,7 +2,7 @@
 
 ## Topology
 
-Radar front end → Xilinx FPGA board (window and range FFT) → Ethernet → edge box (mini PC running k3s) → syncs to AWS when online. A small public demo server on EC2 runs the same services in replay mode.
+Radar front end → Xilinx FPGA board (window and range FFT) → Ethernet → edge box (mini PC running k3s). Syncing recordings to AWS when online is planned, not built. A small public demo server on EC2 runs the same services in replay mode.
 
 ## Frame sources
 
@@ -63,21 +63,20 @@ A run is one pass of the processor over a session; a looping replay makes a new 
 
 | Service | Reads | Writes |
 | --- | --- | --- |
-| source adapter | sim, file, hardware | `frames` |
-| dsp | `frames` | `detections` |
-| tracker | `detections` | `tracks` |
-| classifier | `tracks`, frames | track labels |
-| writer | all topics | Postgres, Parquet |
-| api | Postgres, topics | REST, WebSockets |
-| mcp server | api | agent tools |
+| source | simulator, recording, sound card or FPGA | `frames` |
+| process | `frames` | `detections`, `tracks` (with labels), `rdmaps` |
+| write | `detections`, `tracks` | PostgreSQL |
+| alerts | `tracks` | Telegram, Slack or the log |
+| api | PostgreSQL, topics | REST, WebSockets, the UI |
+| mcp server | PostgreSQL, or a session's Parquet files with no database | agent tools |
 | agent | mcp server | answers, audit log |
 
 ## Agent tools
 
 | Tool | Kind | Public demo |
 | --- | --- | --- |
-| `query_detections(window, filters)` | read | yes |
-| `get_tracks(window, label)` | read | yes |
+| `list_sessions()` | read | yes |
+| `get_tracks(session_id, label, last_minutes)` | read | yes |
 | `summarize_session(session_id)` | read | yes |
 | `search_docs(query)` | read (RAG) | yes |
 | `replay_recording(session_id)` | control | no |
