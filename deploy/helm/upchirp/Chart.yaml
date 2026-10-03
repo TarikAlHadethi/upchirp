@@ -1,0 +1,6 @@
+apiVersion: v2
+name: upchirp
+description: Upchirp on one edge box (k3s), fully offline
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

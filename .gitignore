@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Data and models: download by script, never commit
+data/
+models/
+mlruns/
+*.parquet
+*.onnx
+*.gguf
+*.h5
+*.npz
+
+# Per-person Claude Code settings (who you are: UPCHIRP_OWNER)
+.claude/settings.local.json
+
+# Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.tfvars
+!example.tfvars
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+
+# Node
+node_modules/
+ui/dist/
+
+# Bundle output
+dist/
+bundle/out/
+
+# FPGA build output (Abdullah)
+rtl/build/
+*.jou
+*.log
+.Xil/
+sim_build/
+
+# OS
+.DS_Store
+
+# Private notes, never published (career strategy)
+private/

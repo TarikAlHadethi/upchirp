@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Upchirp live view</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><path d='M4 28 A24 24 0 0 1 28 4' fill='none' stroke='%2338bdf8' stroke-width='3'/><circle cx='4' cy='28' r='3' fill='%2338bdf8'/></svg>" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">Upchirp <span class="sub">live view</span></div>
+      <div class="status">
+        <span id="conn" class="pill off">offline</span>
+        <span id="run" class="muted"></span>
+        <span id="clock" class="mono"></span>
+      </div>
+    </header>
+    <main>
+      <section class="panel map">
+        <h2>Top-down view <span class="muted">radar at the bottom, range rings every 10 m</span></h2>
+        <canvas id="map"></canvas>
+        <div class="legend">
+          <span><i class="dot person"></i>person</span>
+          <span><i class="dot car"></i>car</span>
+          <span><i class="dot drone_like"></i>drone-like</span>
+          <span><i class="dot unknown"></i>not yet labelled</span>
+        </div>
+      </section>
+      <section class="panel rd">
+        <h2>Range and speed <span class="muted">brighter is a stronger echo</span></h2>
+        <canvas id="rd"></canvas>
+        <div class="axis-note muted">range (m) across, radial speed (m/s) up = moving away</div>
+      </section>
+      <section class="panel tracks">
+        <h2>Tracks <span id="track-count" class="muted"></span></h2>
+        <table>
+          <thead><tr><th>id</th><th>type</th><th>range</th><th>angle</th><th>speed</th></tr></thead>
+          <tbody id="track-rows"></tbody>
+        </table>
+      </section>
+      <section class="panel chat">
+        <h2>Ask the agent <span class="muted">answers come from the recorded data</span></h2>
+        <div id="chat-log"></div>
+        <form id="chat-form">
+          <input id="chat-input" autocomplete="off"
+                 placeholder="How many drone-like tracks crossed in the last 10 minutes?" />
+          <button type="submit">Ask</button>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,70 @@
+:root {
+  --bg: #0b1016;
+  --panel: #121a23;
+  --line: #223041;
+  --text: #dbe6f0;
+  --muted: #7d8fa3;
+  --accent: #38bdf8;
+  --person: #60a5fa;
+  --car: #f59e0b;
+  --drone: #f43f5e;
+  --unknown: #94a3b8;
+  --ok: #22c55e;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-size: 14px; }
+.muted { color: var(--muted); font-weight: 400; }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+
+header {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.brand { font-weight: 700; font-size: 18px; letter-spacing: 0.02em; }
+.brand .sub { color: var(--muted); font-weight: 400; font-size: 14px; margin-left: 6px; }
+.status { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.pill { padding: 2px 10px; border-radius: 999px; font-size: 12px; border: 1px solid var(--line); }
+.pill.on { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 50%, transparent); }
+.pill.off { color: var(--drone); border-color: color-mix(in srgb, var(--drone) 50%, transparent); }
+
+main {
+  display: grid; gap: 12px; padding: 12px 16px;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  grid-template-areas: "map rd" "map tracks" "chat chat";
+}
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; grid-template-areas: "map" "rd" "tracks" "chat"; }
+}
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px; min-width: 0; }
+.panel h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.map { grid-area: map; } .rd { grid-area: rd; } .tracks { grid-area: tracks; } .chat { grid-area: chat; }
+canvas { width: 100%; display: block; border-radius: 6px; background: #070b10; }
+#map { aspect-ratio: 1.6; }
+#rd { aspect-ratio: 2.2; image-rendering: pixelated; }
+.axis-note { font-size: 12px; margin-top: 6px; }
+
+.legend { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+.dot.person { background: var(--person); } .dot.car { background: var(--car); }
+.dot.drone_like { background: var(--drone); } .dot.unknown { background: var(--unknown); }
+
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; font-size: 12px; }
+td.num { text-align: right; } th.num { text-align: right; }
+
+#chat-log { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.msg { padding: 8px 10px; border-radius: 8px; line-height: 1.45; max-width: 900px; }
+.msg.user { background: #1b2a3a; align-self: flex-end; }
+.msg.agent { background: #16212c; border: 1px solid var(--line); }
+.msg.wait { color: var(--muted); font-style: italic; }
+.msg.approval { border: 1px solid var(--car); }
+.msg pre { white-space: pre-wrap; font-size: 12px; margin: 6px 0; color: var(--muted); }
+#chat-form { display: flex; gap: 8px; }
+#chat-input { flex: 1; min-width: 0; background: #0b1218; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; font-size: 14px; }
+button { background: var(--accent); color: #04121c; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button:disabled { opacity: 0.5; cursor: default; }

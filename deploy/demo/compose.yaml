@@ -1,0 +1,59 @@
+# Public demo server (step 6): the same services in replay mode, sized for 2 GB of RAM.
+# Started by deploy/demo/server-setup.sh. Only the app's port 80 is reachable.
+name: upchirp-demo
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda start
+      - --mode dev-container
+      - --smp 1
+      - --memory 400M
+      - --reserve-memory 0M
+      - --kafka-addr internal://0.0.0.0:9092
+      - --advertise-kafka-addr internal://redpanda:9092
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 10s
+      retries: 30
+
+  db:
+    image: timescale/timescaledb-ha:pg16
+    command: ["postgres", "-c", "shared_buffers=96MB", "-c", "max_connections=40"]
+    environment:
+      POSTGRES_USER: upchirp
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set by server-setup.sh}
+      POSTGRES_DB: upchirp
+      TIMESCALEDB_TELEMETRY: "off"
+    volumes:
+      - db:/home/postgres/pgdata
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "upchirp"]
+      interval: 10s
+      retries: 30
+
+  app:
+    build: ../..
+    depends_on:
+      redpanda: {condition: service_healthy}
+      db: {condition: service_healthy}
+    environment:
+      UPCHIRP_PUBLIC: "1"
+      UPCHIRP_MODEL: bedrock
+      UPCHIRP_BEDROCK_MODEL: ${BEDROCK_MODEL:-eu.anthropic.claude-opus-5-5}
+      AWS_REGION: ${AWS_REGION:-eu-central-1}
+      UPCHIRP_DAILY_CAP_USD: ${DAILY_CAP_USD:-1.0}
+      UPCHIRP_KAFKA: redpanda:9092
+      UPCHIRP_DATABASE_URL: postgresql://upchirp:${DB_PASSWORD}@db:5432/upchirp
+    ports:
+      - "80:8000"
+    volumes:
+      - data:/data
+    restart: unless-stopped
+
+volumes:
+  db:
+  data:

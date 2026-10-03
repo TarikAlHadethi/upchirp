@@ -1,0 +1,64 @@
+[project]
+name = "upchirp"
+version = "0.0.1"
+description = "Offline sensor data platform with an AI agent; FMCW radar as the sensor"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pyarrow",
+    "pydantic",
+    "typer",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff", "mypy"]
+agent = [
+    "mcp",
+    "langgraph",
+    "langchain-mcp-adapters",
+    "langchain-ollama",
+    "langchain-anthropic",
+    "langchain-aws",
+]
+platform = [
+    "fastapi",
+    "uvicorn[standard]",
+    "confluent-kafka",
+    "psycopg[binary,pool]",
+    "pgvector",
+    "httpx",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-instrumentation-fastapi",
+    "prometheus-client",
+]
+ml = ["kaggle", "torch", "mlflow", "onnx", "onnxscript", "onnxruntime"]
+
+[project.scripts]
+upchirp = "upchirp.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["pyarrow", "pyarrow.*", "scipy", "scipy.*", "onnxruntime", "onnxruntime.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "evals"]

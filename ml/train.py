@@ -1,0 +1,144 @@
+"""Step 9: train the patch classifier on RAD-DAR and report, separately:
+
+  1. RAD-DAR native (11 x 61, its own resolution), held-out recordings
+  2. RAD-DAR converted to our radar's grid (11 x 15), same held-out recordings
+     -> conversion cost = 1 minus 2
+  3. Our simulator, with the converted model (simulated accuracy)
+  4. Abdullah's real recordings: not yet (step 10)
+
+Three recording-level splits; mean and spread reported. Runs on a CPU in minutes.
+Logs to MLflow (mlruns/mlflow.db, git-ignored), exports the converted model to ONNX
+(models/, git-ignored) and writes docs/reports/classifier.md.
+
+    python ml/train.py
+"""
+
+import json
+import statistics
+import sys
+import time
+from pathlib import Path
+
+import mlflow
+import numpy as np
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from upchirp.classify.model import (  # noqa: E402
+    accuracy,
+    confusion,
+    predict,
+    recall_per_class,
+    split_by_recording,
+    to_onnx,
+    train,
+)
+from upchirp.classify.patches import (  # noqa: E402
+    CLASSES,
+    FLOOR_DB,
+    convert_to_grid,
+    load_raddar,
+    normalise,
+    our_doppler_cells,
+)
+from upchirp.classify.simdata import simulated_patches  # noqa: E402
+from upchirp.config import ChirpConfig  # noqa: E402
+
+SEEDS = (0, 1, 2)
+INTERPRETATION = (ROOT / "ml" / "report_notes.md").read_text(encoding="utf-8").strip()
+
+
+def fmt(xs: list[float]) -> str:
+    return f"{100 * statistics.mean(xs):.1f}% (spread {100 * (max(xs) - min(xs)):.1f})"
+
+
+def main() -> None:
+    t0 = time.time()
+    chirp = ChirpConfig()
+    raw, y, rec = load_raddar(ROOT / "data/raddar", ROOT / "data/raddar_cache.npz")
+    native = normalise(raw)
+    converted = normalise(convert_to_grid(raw, chirp))
+    sim_x, sim_y = simulated_patches()
+    sim_x = normalise(sim_x)
+    print(f"RAD-DAR {len(y)} samples, {len(set(rec))} recordings; simulator {len(sim_y)} patches")
+
+    (ROOT / "mlruns").mkdir(exist_ok=True)
+    mlflow.set_tracking_uri("sqlite:///" + (ROOT / "mlruns" / "mlflow.db").as_posix())
+    mlflow.set_experiment("upchirp-classifier")
+    results: dict[str, list[float]] = {"native": [], "converted": [], "simulated": []}
+    confusions: dict[str, np.ndarray] = {}
+    models = {}
+    for seed in SEEDS:
+        split = split_by_recording(y, rec, seed)
+        for name, x in (("native", native), ("converted", converted)):
+            with mlflow.start_run(run_name=f"{name}-split{seed}"):
+                res = train(x, y, split, seed)
+                acc = accuracy(res.model, x[split.test], y[split.test])
+                cm = confusion(y[split.test], predict(res.model, x[split.test]))
+                mlflow.log_params({"grid": name, "split_seed": seed, "shape": str(x.shape[1:]),
+                                   "floor_db": FLOOR_DB, "best_epoch": res.epochs})
+                mlflow.log_metrics({"val_accuracy": res.val_accuracy, "test_accuracy": acc,
+                                    **{f"recall_{k}": v for k, v in recall_per_class(cm).items()}})
+                results[name].append(acc)
+                confusions[f"{name}-{seed}"] = cm
+                if name == "converted":
+                    sim_acc = accuracy(res.model, sim_x, sim_y)
+                    sim_cm = confusion(sim_y, predict(res.model, sim_x))
+                    mlflow.log_metric("simulated_accuracy", sim_acc)
+                    results["simulated"].append(sim_acc)
+                    confusions[f"simulated-{seed}"] = sim_cm
+                    models[seed] = res.model
+                print(f"split {seed} {name:9}: test {acc:.3f} (val {res.val_accuracy:.3f})")
+        print(f"split {seed} simulated : {results['simulated'][-1]:.3f}")
+
+    out = ROOT / "models"
+    out.mkdir(exist_ok=True)
+    n_d = our_doppler_cells(chirp)
+    to_onnx(models[0], 11, n_d, out / "classifier.onnx")
+    (out / "classifier.json").write_text(json.dumps(
+        {"classes": list(CLASSES), "range_cells": 11, "doppler_cells": n_d,
+         "floor_db": FLOOR_DB, "chirp_config": chirp.id, "trained_on": "RAD-DAR, split 0"},
+        indent=2))
+    write_report(results, confusions, len(y), len(set(rec)), len(sim_y), n_d, time.time() - t0)
+
+
+def write_report(results: dict[str, list[float]], cms: dict[str, np.ndarray], n: int,
+                 n_rec: int, n_sim: int, n_d: int, seconds: float) -> None:
+    native, conv, sim = results["native"], results["converted"], results["simulated"]
+    cost = [a - b for a, b in zip(native, conv, strict=True)]
+
+    def table(cm: np.ndarray) -> list[str]:
+        rows = ["| true \\ predicted | " + " | ".join(CLASSES) + " | recall |",
+                "| --- |" + " --- |" * (len(CLASSES) + 1)]
+        for i, c in enumerate(CLASSES):
+            recall = cm[i, i] / cm[i].sum() if cm[i].sum() else float("nan")
+            rows.append(f"| {c} | " + " | ".join(str(v) for v in cm[i]) + f" | {recall:.1%} |")
+        return rows
+
+    lines = [
+        "# Classifier results (step 9)", "",
+        f"Generated by `python ml/train.py` in {seconds / 60:.1f} minutes on a CPU.", "",
+        f"Data: RAD-DAR, {n} samples from {n_rec} recordings (people, cars, drones). Test sets "
+        "are whole recordings held out from training (three random splits), because samples "
+        "within one recording are near-copies.", "",
+        "| Measure | Accuracy, mean of 3 splits |", "| --- | --- |",
+        f"| RAD-DAR, native grid (11 x 61) | {fmt(native)} |",
+        f"| RAD-DAR, converted to our grid (11 x {n_d}) | {fmt(conv)} |",
+        f"| Conversion cost (native minus converted) | {100 * statistics.mean(cost):+.1f} "
+        "points |",
+        f"| Our simulator ({n_sim} patches, converted model) | {fmt(sim)} |",
+        "| Real recordings from our radar | not yet (step 10) |", "",
+        INTERPRETATION, "",
+        "## Converted model on held-out RAD-DAR recordings (split 0)", "",
+        *table(cms["converted-0"]), "",
+        "## Converted model on our simulator (split 0)", "",
+        *table(cms["simulated-0"]), "",
+    ]
+    path = ROOT / "docs/reports/classifier.md"
+    path.write_text("\n".join(lines), encoding="utf-8")
+    print("\n".join(lines[:14]))
+
+
+if __name__ == "__main__":
+    main()

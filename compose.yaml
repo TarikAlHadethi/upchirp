@@ -1,0 +1,48 @@
+# Development stack: streaming, storage and the local model.
+# Every port binds to localhost only. Start with `make up`, stop with `make down`.
+name: upchirp
+
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+    command:
+      - redpanda start
+      - --mode dev-container
+      - --smp 1
+      - --memory 1G
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://127.0.0.1:19092
+    ports:
+      - "127.0.0.1:19092:19092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--exit-when-healthy"]
+      interval: 5s
+      retries: 20
+
+  db:
+    image: timescale/timescaledb-ha:pg16
+    environment:
+      POSTGRES_USER: upchirp
+      POSTGRES_PASSWORD: upchirp-dev-only
+      POSTGRES_DB: upchirp
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - upchirp-db:/home/postgres/pgdata
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "upchirp"]
+      interval: 5s
+      retries: 20
+
+  ollama:
+    image: ollama/ollama
+    container_name: upchirp-ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - upchirp-ollama:/root/.ollama
+
+volumes:
+  upchirp-db:
+  upchirp-ollama:
+    external: true

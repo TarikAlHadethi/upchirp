@@ -1,0 +1,125 @@
+# The Upchirp services: one image, one Deployment per role (see src/upchirp/services.py).
+{{- $root := . }}
+{{- range $role := list "process" "write" "api" "source" "alerts" }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upchirp-{{ $role }}
+  labels: {{- include "upchirp.labels" $root | nindent 4 }}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: upchirp-{{ $role }}}}
+  template:
+    metadata:
+      labels:
+        app: upchirp-{{ $role }}
+        {{- if or (eq $role "process") (eq $role "write") }}
+        upchirp/metrics: "9100"
+        {{- end }}
+    spec:
+      {{- if or (eq $role "api") (eq $role "source") }}
+      securityContext: {fsGroup: 1000}
+      {{- end }}
+      containers:
+        - name: {{ $role }}
+          image: {{ $root.Values.images.app }}
+          imagePullPolicy: {{ $root.Values.pullPolicy }}
+          {{- if eq $role "api" }}
+          command: ["upchirp"]
+          args: ["api", "--host", "0.0.0.0", "--port", "8000"]
+          ports: [{containerPort: 8000, name: http}]
+          readinessProbe:
+            httpGet: {path: /api/health, port: 8000}
+            periodSeconds: 10
+          {{- else if eq $role "source" }}
+          command: ["sh", "-c"]
+          args: ["until ls /data/sessions/*/session.json >/dev/null 2>&1; do sleep 5; done; exec upchirp source --loop --session latest"]
+          {{- else }}
+          command: ["upchirp"]
+          args: [{{ $role | quote }}]
+          ports: [{containerPort: 9100, name: metrics}]
+          {{- end }}
+          env:
+            {{- include "upchirp.appEnv" $root | nindent 12 }}
+            - {name: UPCHIRP_METRICS_PORT, value: "9100"}
+          {{- if eq $role "alerts" }}
+          # optional Secret upchirp-alerts: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID or SLACK_WEBHOOK_URL
+          envFrom: [{secretRef: {name: upchirp-alerts, optional: true}}]
+          {{- end }}
+          {{- if or (eq $role "api") (eq $role "source") }}
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: upchirp-data}
+          {{- end }}
+{{- end }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: upchirp-data
+  labels: {{- include "upchirp.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]   # one node: the pods sharing it run side by side
+  resources: {requests: {storage: {{ .Values.storage.data }}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: upchirp-api}
+spec:
+  type: NodePort
+  selector: {app: upchirp-api}
+  ports: [{port: 8000, targetPort: 8000, nodePort: {{ .Values.ui.nodePort }}}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: upchirp-metrics}
+spec:
+  clusterIP: None   # headless: Prometheus finds each pod
+  selector: {upchirp/metrics: "9100"}
+  ports: [{port: 9100, name: metrics}]
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: upchirp
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: upchirp-api, port: {number: 8000}}}
+---
+# First install: record the simulated scenes and index the docs for search.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: upchirp-seed
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 10
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext: {fsGroup: 1000}
+      containers:
+        - name: seed
+          image: {{ .Values.images.app }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          command: ["sh", "-c"]
+          args:
+            - >-
+              {{- range .Values.source.scenes }}
+              (ls /data/sessions 2>/dev/null | grep -q "sim-{{ . }}-" || upchirp sim --scene {{ . }}) &&
+              {{- end }}
+              upchirp index-docs
+          env:
+            {{- include "upchirp.appEnv" . | nindent 12 }}
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: upchirp-data}

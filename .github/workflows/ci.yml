@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev,agent,platform]"
+      - run: ruff check .
+      - run: mypy src
+      - run: pytest tests
+      # A regression fails the build. Agent evals skip here (no model in CI);
+      # run them locally with Ollama up, or with UPCHIRP_MODEL=anthropic and a key.
+      - run: pytest evals
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - run: npm run build
+
+  platform:
+    # Redpanda and Postgres from compose.yaml; end-to-end stream test and SQL checks.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: docker volume create upchirp-ollama && docker compose up -d --wait redpanda db
+      - run: pip install -e ".[dev,agent,platform]"
+      - run: pytest tests/test_platform_live.py evals/test_agent_sql.py
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/upchirp
+      - run: helm template up deploy/helm/upchirp --namespace upchirp > /dev/null
+      - run: for f in deploy/bundle/*.sh deploy/demo/*.sh; do bash -n "$f"; done

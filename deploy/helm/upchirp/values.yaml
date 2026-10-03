@@ -1,0 +1,31 @@
+# Every image is loaded from the offline bundle; nothing is pulled from the internet.
+images:
+  app: docker.io/library/upchirp-app:0.1.0
+  redpanda: docker.redpanda.com/redpandadata/redpanda:v24.2.7
+  db: docker.io/library/upchirp-postgres:16          # deploy/images/postgres (1.7 GB)
+  ollama: docker.io/library/upchirp-ollama-cpu:0.35.1  # deploy/images/ollama-cpu (0.2 GB)
+  prometheus: docker.io/prom/prometheus:v3.5.0
+  grafana: docker.io/grafana/grafana:12.1.1
+pullPolicy: IfNotPresent
+
+agent:
+  model: qwen2.5:7b-instruct     # chat model, preloaded into hostPath below
+  embedModel: nomic-embed-text   # for document search
+  public: false                  # true = read-only tools (demo mode)
+
+# Ollama model files are copied here by install.sh
+ollamaHostPath: /var/lib/upchirp/ollama
+
+source:
+  # what the radar source replays until real hardware arrives (step 10)
+  scenes: [default, crossing]
+
+ui:
+  nodePort: 30080     # also served on port 80 through k3s's Traefik ingress
+grafana:
+  nodePort: 30300
+
+storage:
+  db: 10Gi
+  redpanda: 5Gi
+  data: 5Gi

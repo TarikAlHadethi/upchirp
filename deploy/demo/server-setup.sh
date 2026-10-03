@@ -1,0 +1,37 @@
+#!/bin/bash
+# Runs on the demo server as root: first boot (from Terraform user data) and every deploy
+# (through SSM). Installs Docker, fetches the release from S3, and (re)starts the stack.
+set -euo pipefail
+BUCKET="$1"
+REGION="${2:-eu-central-1}"
+APP=/opt/upchirp
+
+if ! command -v docker >/dev/null; then
+  dnf install -y docker
+  systemctl enable --now docker
+  mkdir -p /usr/libexec/docker/cli-plugins
+  curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
+    "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64"
+  chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+  # 2 GB of RAM: add 2 GB of swap for image builds and the database
+  if [ ! -f /swapfile ]; then
+    dd if=/dev/zero of=/swapfile bs=1M count=2048 && chmod 600 /swapfile
+    mkswap /swapfile && swapon /swapfile && echo "/swapfile none swap sw 0 0" >> /etc/fstab
+  fi
+fi
+
+mkdir -p "$APP"
+aws s3 cp --region "$REGION" "s3://$BUCKET/releases/upchirp.tar.gz" /tmp/upchirp.tar.gz
+tar -xzf /tmp/upchirp.tar.gz -C "$APP"
+
+ENV_FILE="$APP/deploy/demo/.env"
+if [ ! -f /etc/upchirp-db-password ]; then
+  head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' > /etc/upchirp-db-password
+  chmod 600 /etc/upchirp-db-password
+fi
+printf 'DB_PASSWORD=%s\nAWS_REGION=%s\n' "$(cat /etc/upchirp-db-password)" "$REGION" > "$ENV_FILE"
+chmod 600 "$ENV_FILE"
+
+cd "$APP/deploy/demo"
+docker compose up -d --build --remove-orphans
+docker image prune -f

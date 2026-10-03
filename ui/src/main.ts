@@ -1,0 +1,346 @@
+import "./style.css";
+
+type Label = "person" | "car" | "drone_like" | "unknown";
+
+interface Track {
+  track_id: number;
+  confirmed: boolean;
+  x_m: number;
+  y_m: number;
+  range_m: number;
+  azimuth_deg: number;
+  speed_mps: number;
+  radial_velocity_mps: number;
+  label: Label;
+}
+
+interface Head {
+  run_id: string;
+  session_id: string;
+  frame_index: number;
+  timestamp_ns: number;
+}
+
+type LiveMessage =
+  | (Head & { type: "tracks"; tracks: Track[] })
+  | (Head & { type: "detections"; detections: unknown[] })
+  | (Head & {
+      type: "rdmaps";
+      shape: [number, number];
+      range_bin_m: number;
+      velocity_bin_mps: number;
+      data: string;
+    });
+
+const COLORS: Record<Label, string> = {
+  person: "#60a5fa",
+  car: "#f59e0b",
+  drone_like: "#f43f5e",
+  unknown: "#94a3b8",
+};
+const LABEL_TEXT: Record<Label, string> = {
+  person: "person",
+  car: "car",
+  drone_like: "drone-like",
+  unknown: "…",
+};
+const MAP_RANGE_M = 80;
+const RD_MAX_RANGE_BINS = 100;
+const TRAIL = 60;
+
+const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+const mapCanvas = $<HTMLCanvasElement>("map");
+const rdCanvas = $<HTMLCanvasElement>("rd");
+
+// ---------- state ----------
+let runId = "";
+let tracks: Track[] = [];
+const trails = new Map<number, Array<[number, number]>>();
+
+function resetRun(id: string): void {
+  runId = id;
+  trails.clear();
+  $("run").textContent = `run ${id}`;
+}
+
+// ---------- top-down map ----------
+function fitCanvas(c: HTMLCanvasElement): CanvasRenderingContext2D {
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth;
+  const h = c.clientHeight;
+  if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+    c.width = Math.round(w * dpr);
+    c.height = Math.round(h * dpr);
+  }
+  const ctx = c.getContext("2d")!;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return ctx;
+}
+
+function drawMap(): void {
+  const ctx = fitCanvas(mapCanvas);
+  const w = mapCanvas.clientWidth;
+  const h = mapCanvas.clientHeight;
+  ctx.clearRect(0, 0, w, h);
+  const scale = Math.min((h - 24) / MAP_RANGE_M, w / 2 / MAP_RANGE_M);
+  if (!(scale > 0)) return; // not laid out yet
+  const ox = w / 2;
+  const oy = h - 12;
+  const px = (x: number, y: number): [number, number] => [ox + x * scale, oy - y * scale];
+
+  // field of view and range rings
+  ctx.strokeStyle = "#1e2b3a";
+  ctx.fillStyle = "#4b5d70";
+  ctx.font = "11px system-ui";
+  ctx.lineWidth = 1;
+  for (let r = 10; r <= MAP_RANGE_M; r += 10) {
+    ctx.beginPath();
+    ctx.arc(ox, oy, r * scale, Math.PI, 2 * Math.PI);
+    ctx.stroke();
+    ctx.fillText(`${r} m`, ox + 4, oy - r * scale + 12);
+  }
+  for (const deg of [-60, -30, 0, 30, 60]) {
+    const a = (deg * Math.PI) / 180;
+    const [x, y] = px(MAP_RANGE_M * Math.sin(a), MAP_RANGE_M * Math.cos(a));
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#38bdf8";
+  ctx.beginPath();
+  ctx.arc(ox, oy, 5, 0, 2 * Math.PI);
+  ctx.fill();
+
+  // trails, then tracks
+  for (const t of tracks) {
+    const color = COLORS[t.label] ?? COLORS.unknown;
+    const trail = trails.get(t.track_id) ?? [];
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    trail.forEach(([x, y], i) => {
+      const [a, b] = px(x, y);
+      if (i === 0) ctx.moveTo(a, b);
+      else ctx.lineTo(a, b);
+    });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    const [a, b] = px(t.x_m, t.y_m);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(a, b, t.label === "car" ? 7 : 5.5, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = "#dbe6f0";
+    ctx.fillText(`${t.track_id} ${LABEL_TEXT[t.label] ?? ""}`, a + 9, b + 4);
+  }
+}
+
+// ---------- range-Doppler heatmap ----------
+const LUT = buildLut();
+
+function buildLut(): Uint8ClampedArray {
+  // dark blue -> teal -> yellow -> white, readable on a dark page
+  const stops: Array<[number, [number, number, number]]> = [
+    [0, [7, 11, 16]],
+    [0.35, [14, 60, 110]],
+    [0.6, [20, 150, 160]],
+    [0.85, [250, 210, 70]],
+    [1, [255, 255, 255]],
+  ];
+  const lut = new Uint8ClampedArray(256 * 3);
+  for (let i = 0; i < 256; i++) {
+    const v = i / 255;
+    let k = 0;
+    while (k < stops.length - 2 && v > stops[k + 1][0]) k++;
+    const [v0, c0] = stops[k];
+    const [v1, c1] = stops[k + 1];
+    const f = (v - v0) / (v1 - v0);
+    for (let j = 0; j < 3; j++) lut[i * 3 + j] = c0[j] + (c1[j] - c0[j]) * f;
+  }
+  return lut;
+}
+
+function drawRd(msg: Extract<LiveMessage, { type: "rdmaps" }>): void {
+  const [nDop, nRng] = msg.shape;
+  const cols = Math.min(nRng, RD_MAX_RANGE_BINS);
+  const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
+  const img = new ImageData(cols, nDop);
+  for (let d = 0; d < nDop; d++) {
+    const row = nDop - 1 - d; // positive speed at the top
+    for (let r = 0; r < cols; r++) {
+      const v = bytes[d * nRng + r];
+      const o = (row * cols + r) * 4;
+      img.data[o] = LUT[v * 3];
+      img.data[o + 1] = LUT[v * 3 + 1];
+      img.data[o + 2] = LUT[v * 3 + 2];
+      img.data[o + 3] = 255;
+    }
+  }
+  const off = new OffscreenCanvas(cols, nDop);
+  off.getContext("2d")!.putImageData(img, 0, 0);
+  const ctx = fitCanvas(rdCanvas);
+  const w = rdCanvas.clientWidth;
+  const h = rdCanvas.clientHeight;
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(off, 0, 0, w, h);
+
+  ctx.fillStyle = "rgba(219,230,240,0.8)";
+  ctx.font = "11px system-ui";
+  for (let m = 20; m < cols * msg.range_bin_m; m += 20) {
+    ctx.fillText(`${m}`, (m / msg.range_bin_m / cols) * w + 2, h - 4);
+  }
+  const vmax = (nDop / 2) * msg.velocity_bin_mps;
+  ctx.fillText(`+${vmax.toFixed(0)} m/s`, 4, 12);
+  ctx.fillText(`-${vmax.toFixed(0)} m/s`, 4, h - 16);
+}
+
+// ---------- track table ----------
+function renderTable(): void {
+  const body = $("track-rows");
+  body.replaceChildren(
+    ...[...tracks]
+      .sort((a, b) => a.range_m - b.range_m)
+      .map((t) => {
+        const tr = document.createElement("tr");
+        const cells: Array<[string, boolean]> = [
+          [String(t.track_id), false],
+          [LABEL_TEXT[t.label] ?? t.label, false],
+          [`${t.range_m.toFixed(1)} m`, true],
+          [`${t.azimuth_deg.toFixed(0)}°`, true],
+          [`${t.speed_mps.toFixed(1)} m/s`, true],
+        ];
+        for (const [text, num] of cells) {
+          const td = document.createElement("td");
+          td.textContent = text;
+          if (num) td.className = "num";
+          tr.append(td);
+        }
+        tr.firstElementChild!.setAttribute("style", `color:${COLORS[t.label] ?? COLORS.unknown}`);
+        return tr;
+      }),
+  );
+  $("track-count").textContent = `${tracks.length} confirmed`;
+}
+
+// ---------- live connection ----------
+function connect(): void {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws/live`);
+  const conn = $("conn");
+  ws.onopen = () => {
+    conn.textContent = "live";
+    conn.className = "pill on";
+  };
+  ws.onclose = () => {
+    conn.textContent = "offline";
+    conn.className = "pill off";
+    setTimeout(connect, 2000);
+  };
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data) as LiveMessage;
+    if (msg.run_id !== runId) resetRun(msg.run_id);
+    $("clock").textContent = new Date(msg.timestamp_ns / 1e6).toISOString().slice(11, 21) + " UTC";
+    if (msg.type === "tracks") {
+      tracks = msg.tracks.filter((t) => t.confirmed);
+      for (const t of tracks) {
+        const trail = trails.get(t.track_id) ?? [];
+        trail.push([t.x_m, t.y_m]);
+        if (trail.length > TRAIL) trail.shift();
+        trails.set(t.track_id, trail);
+      }
+      drawMap();
+      renderTable();
+    } else if (msg.type === "rdmaps") {
+      drawRd(msg);
+    }
+  };
+}
+
+// ---------- chat ----------
+const log = $("chat-log");
+
+function bubble(kind: string, text: string): HTMLDivElement {
+  const div = document.createElement("div");
+  div.className = `msg ${kind}`;
+  div.textContent = text; // plain text only: answers may echo untrusted data
+  log.append(div);
+  log.scrollTop = log.scrollHeight;
+  return div;
+}
+
+interface Turn {
+  thread_id: string;
+  status: "answered" | "needs_approval";
+  answer?: string;
+  tool_calls?: Array<{ name: string; args: unknown }>;
+}
+
+async function post(path: string, body: unknown): Promise<Turn> {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = `${res.status}`;
+    try {
+      detail = ((await res.json()) as { detail?: string }).detail ?? detail;
+    } catch {
+      /* not JSON */
+    }
+    throw new Error(detail);
+  }
+  return (await res.json()) as Turn;
+}
+
+async function waitFor(work: Promise<Turn>): Promise<void> {
+  const wait = bubble("agent wait", "Thinking…");
+  const started = Date.now();
+  const timer = setInterval(() => {
+    wait.textContent = `Thinking… ${Math.round((Date.now() - started) / 1000)} s`;
+  }, 1000);
+  try {
+    show(await work);
+  } catch (e) {
+    bubble("agent", (e as Error).message);
+  } finally {
+    clearInterval(timer);
+    wait.remove();
+  }
+}
+
+function show(turn: Turn): void {
+  if (turn.status === "answered") {
+    bubble("agent", turn.answer ?? "");
+    return;
+  }
+  const box = bubble("agent approval", "The agent wants to change radar settings. Allow it?");
+  const pre = document.createElement("pre");
+  pre.textContent = JSON.stringify(turn.tool_calls, null, 2);
+  const yes = document.createElement("button");
+  yes.textContent = "Approve";
+  const no = document.createElement("button");
+  no.textContent = "Deny";
+  no.className = "secondary";
+  const decide = (approve: boolean) => {
+    yes.disabled = no.disabled = true;
+    void waitFor(post(`/api/ask/${turn.thread_id}/decision`, { approve }));
+  };
+  yes.onclick = () => decide(true);
+  no.onclick = () => decide(false);
+  box.append(pre, yes, " ", no);
+}
+
+$<HTMLFormElement>("chat-form").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const input = $<HTMLInputElement>("chat-input");
+  const question = input.value.trim() || input.placeholder;
+  input.value = "";
+  bubble("user", question);
+  void waitFor(post("/api/ask", { question }));
+});
+
+window.addEventListener("resize", drawMap);
+connect();
+requestAnimationFrame(drawMap);

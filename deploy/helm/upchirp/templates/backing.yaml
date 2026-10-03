@@ -1,0 +1,127 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: upchirp-db
+  labels: {{- include "upchirp.labels" . | nindent 4 }}
+type: Opaque
+stringData:
+  password: {{ include "upchirp.dbPassword" . | quote }}
+---
+# Redpanda: one broker, memory capped for a small box (decision 0001)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redpanda
+  labels: {{- include "upchirp.labels" . | nindent 4 }}
+spec:
+  serviceName: redpanda
+  replicas: 1
+  selector: {matchLabels: {app: redpanda}}
+  template:
+    metadata: {labels: {app: redpanda}}
+    spec:
+      containers:
+        - name: redpanda
+          image: {{ .Values.images.redpanda }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          args:
+            - redpanda
+            - start
+            - --mode=dev-container
+            - --smp=1
+            - --memory=1G
+            - --reserve-memory=0M
+            - --kafka-addr=internal://0.0.0.0:9092
+            - --advertise-kafka-addr=internal://redpanda:9092
+          ports: [{containerPort: 9092}]
+          readinessProbe:
+            exec: {command: ["rpk", "cluster", "health", "--exit-when-healthy"]}
+            periodSeconds: 10
+          volumeMounts: [{name: data, mountPath: /var/lib/redpanda/data}]
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: {{ .Values.storage.redpanda }}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: redpanda}
+spec:
+  selector: {app: redpanda}
+  ports: [{port: 9092}]
+---
+# PostgreSQL with TimescaleDB and pgvector (decision 0007)
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  labels: {{- include "upchirp.labels" . | nindent 4 }}
+spec:
+  serviceName: db
+  replicas: 1
+  selector: {matchLabels: {app: db}}
+  template:
+    metadata: {labels: {app: db}}
+    spec:
+      securityContext: {fsGroup: 999}   # the postgres user in the official image
+      containers:
+        - name: db
+          image: {{ .Values.images.db }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          env:
+            - {name: POSTGRES_USER, value: upchirp}
+            - {name: POSTGRES_DB, value: upchirp}
+            - name: POSTGRES_PASSWORD
+              valueFrom: {secretKeyRef: {name: upchirp-db, key: password}}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports: [{containerPort: 5432}]
+          readinessProbe:
+            exec: {command: ["pg_isready", "-U", "upchirp"]}
+            periodSeconds: 10
+          volumeMounts: [{name: pgdata, mountPath: /var/lib/postgresql/data}]
+  volumeClaimTemplates:
+    - metadata: {name: pgdata}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: {{ .Values.storage.db }}}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: db}
+spec:
+  selector: {app: db}
+  ports: [{port: 5432}]
+---
+# Ollama: local models, preloaded from the bundle into a host folder (decision 0005)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  labels: {{- include "upchirp.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: ollama}}
+  template:
+    metadata: {labels: {app: ollama}}
+    spec:
+      containers:
+        - name: ollama
+          image: {{ .Values.images.ollama }}
+          imagePullPolicy: {{ .Values.pullPolicy }}
+          env: [{name: OLLAMA_KEEP_ALIVE, value: "24h"}]
+          ports: [{containerPort: 11434}]
+          readinessProbe:
+            httpGet: {path: /api/tags, port: 11434}
+            periodSeconds: 10
+          volumeMounts: [{name: models, mountPath: /root/.ollama}]
+      volumes:
+        - name: models
+          hostPath: {path: {{ .Values.ollamaHostPath }}, type: Directory}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: ollama}
+spec:
+  selector: {app: ollama}
+  ports: [{port: 11434}]
