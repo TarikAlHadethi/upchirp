@@ -149,8 +149,10 @@ def run_processor(from_start: bool = False, max_idle_s: float | None = None) -> 
                 metrics.BAD_MESSAGES.labels("processor").inc()
                 log.warning("skipped an unreadable frame: %s", e)
     finally:
-        proc.prod.flush(10)
-        cons.close()
+        try:
+            proc.prod.flush(10)
+        finally:
+            cons.close()
 
 
 def run_writer(from_start: bool = False, max_idle_s: float | None = None) -> None:
@@ -206,6 +208,11 @@ def run_writer(from_start: bool = False, max_idle_s: float | None = None) -> Non
             if len(pending) >= 50:
                 flush()
     finally:
-        flush()
-        cons.close()
-        conn.close()
+        # Leave the consumer group even if this last write fails, so a restarted writer
+        # gets the partitions at once instead of after the session timeout. Offsets of a
+        # batch that was not written were never stored, so it is read again.
+        try:
+            flush()
+        finally:
+            cons.close()
+            conn.close()

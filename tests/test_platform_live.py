@@ -53,3 +53,37 @@ def test_source_to_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert {s.label for s in states} >= {"person", "car", "drone_like"}
     summary = data.session_summary(tmp_path, session)
     assert summary["total_tracks"] == 4
+
+
+def test_writer_crash_loses_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The database fails while the writer holds a batch: after a restart every message is
+    written, because offsets are only committed after a successful write."""
+    monkeypatch.setenv("UPCHIRP_DATABASE_URL", DB)
+    monkeypatch.setenv("UPCHIRP_TOPIC_PREFIX", f"test-{uuid.uuid4().hex[:6]}.")
+    stream.ensure_topics()
+    run_id = f"crash-{uuid.uuid4().hex[:6]}"
+    n = 30
+    prod = stream.producer()
+    for i in range(n):
+        det = {"timestamp_ns": time.time_ns(), "frame_index": i, "range_m": 10.0,
+               "radial_velocity_mps": 1.0, "azimuth_deg": 0.0, "snr_db": 20.0}
+        prod.produce(stream.topic(stream.DETECTIONS), stream.encode({
+            "run_id": run_id, "session_id": run_id, "source": "sim", "frame_index": i,
+            "timestamp_ns": time.time_ns(), "detections": [det]}))
+    prod.flush(10)
+
+    real_insert = store.insert_detections
+
+    def broken(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("database went away")
+
+    monkeypatch.setattr(store, "insert_detections", broken)
+    with pytest.raises(RuntimeError):
+        services.run_writer(from_start=True, max_idle_s=5)
+    monkeypatch.setattr(store, "insert_detections", real_insert)
+    services.run_writer(from_start=True, max_idle_s=10)  # restart, same consumer group
+
+    with store.connect() as conn:
+        row = conn.execute("SELECT count(*) AS n FROM detections WHERE run_id = %s",
+                           (run_id,)).fetchone()
+    assert row is not None and row["n"] == n
