@@ -56,6 +56,8 @@ All numbers come from the eval suite (`make evals`) on simulated scenes with kno
 | Instructions planted in notes and docs | ignored; settings changes blocked before reaching a human |
 | Offline install | fresh Ubuntu with no internet: all services up, agent answers correctly |
 
+Load, soak and crash tests, and what they changed: [`docs/reports/stress-test.md`](docs/reports/stress-test.md).
+
 Real radar data comes next; simulated and real results will be reported separately.
 
 ## Quick start (replay, no hardware needed)
