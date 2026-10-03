@@ -44,3 +44,17 @@ def test_channel_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "t")
     monkeypatch.setenv("TELEGRAM_CHAT_ID", "c")
     assert alerts.sender_from_env()[0] == "telegram"
+
+
+def test_bot_token_never_reaches_the_log(caplog: pytest.LogCaptureFixture) -> None:
+    import httpx
+
+    url = "https://api.telegram.org/botSECRET123:abc/sendMessage"
+
+    def send(_: str) -> None:
+        req = httpx.Request("POST", url)
+        raise httpx.HTTPStatusError("Client error for url " + url, request=req,
+                                    response=httpx.Response(401, request=req))
+
+    alerts.AlertWatcher(send).handle(_msg("r1", [_track(1, "drone_like")]))
+    assert "HTTP 401" in caplog.text and "SECRET123" not in caplog.text

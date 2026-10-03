@@ -27,6 +27,13 @@ log = logging.getLogger("upchirp.alerts")
 Send = Callable[[str], None]
 
 
+def _safe(e: Exception) -> str:
+    """What went wrong, without the URL: Telegram's holds the bot token, Slack's is secret."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return f"HTTP {e.response.status_code}"
+    return type(e).__name__
+
+
 def telegram_sender(token: str, chat_id: str) -> Send:
     def send(text: str) -> None:
         httpx.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=10,
@@ -77,12 +84,13 @@ class AlertWatcher:
                 self.send(text)
                 sent.append(text)
             except Exception as e:  # never let a flaky network stop the watcher
-                log.error("alert not sent: %s", e)
+                log.error("alert not sent: %s", _safe(e))
         return sent
 
 
 def run_alerts() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # it logs each URL, token included
     stream.ensure_topics()
     channel, send = sender_from_env()
     log.info("alerts go to: %s", channel)
