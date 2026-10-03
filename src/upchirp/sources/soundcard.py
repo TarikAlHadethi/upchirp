@@ -35,10 +35,15 @@ class CoffeeCanConfig:
     chirps_per_frame: int = 16
     usable_fraction: float = 0.95   # drop the end of each sweep, where the VCO settles
 
+    def config_id(self, sample_rate_hz: float) -> str:
+        """Every setting, exactly, so the processor rebuilds the same chirp config."""
+        return (f"{ID_PREFIX}:f={self.f_start_hz!r},b={self.bandwidth_hz!r},s={self.sweep_s!r},"
+                f"c={self.chirps_per_frame},u={self.usable_fraction!r},r={sample_rate_hz!r}")
+
     def chirp_config(self, sample_rate_hz: float) -> ChirpConfig:
         n_samples = int(self.sweep_s * sample_rate_hz * self.usable_fraction)
         return ChirpConfig(
-            id=f"coffee-can-{self.bandwidth_hz / 1e6:.0f}mhz-{sample_rate_hz / 1e3:.0f}k",
+            id=self.config_id(sample_rate_hz),
             f_start_hz=self.f_start_hz,
             bandwidth_hz=self.bandwidth_hz,
             chirp_duration_s=self.sweep_s,
@@ -48,6 +53,18 @@ class CoffeeCanConfig:
             sample_rate_hz=sample_rate_hz,
             max_range_bin=n_samples // 2,       # real beat signal: one-sided spectrum
         )
+
+
+ID_PREFIX = "coffee-can-v1"
+
+
+def config_from_id(config_id: str) -> tuple[CoffeeCanConfig, float]:
+    """(config, sample rate) back from CoffeeCanConfig.config_id, exactly."""
+    parts = dict(p.split("=", 1) for p in config_id.removeprefix(ID_PREFIX + ":").split(","))
+    cfg = CoffeeCanConfig(f_start_hz=float(parts["f"]), bandwidth_hz=float(parts["b"]),
+                          sweep_s=float(parts["s"]), chirps_per_frame=int(parts["c"]),
+                          usable_fraction=float(parts["u"]))
+    return cfg, float(parts["r"])
 
 
 def read_wav(path: Path) -> tuple[float, npt.NDArray[np.float64], npt.NDArray[np.float64]]:

@@ -329,6 +329,7 @@ def vectors(
 @app.command("import-wav")
 def import_wav(
     path: Annotated[Path, typer.Argument(help="Stereo WAV: beat signal left, sync right")],
+    start_mhz: Annotated[float, typer.Option(help="VCO sweep start frequency")] = 2400.0,
     bandwidth_mhz: Annotated[float, typer.Option(help="VCO sweep bandwidth")] = 80.0,
     sweep_ms: Annotated[float, typer.Option(help="Up-sweep time")] = 20.0,
     notes: Annotated[str, typer.Option(help="Operator notes stored with the session")] = "",
@@ -339,7 +340,8 @@ def import_wav(
     from upchirp.recording import record_frames
     from upchirp.sources.soundcard import CoffeeCanConfig, SoundcardSource
 
-    cfg = CoffeeCanConfig(bandwidth_hz=bandwidth_mhz * 1e6, sweep_s=sweep_ms / 1e3)
+    cfg = CoffeeCanConfig(f_start_hz=start_mhz * 1e6, bandwidth_hz=bandwidth_mhz * 1e6,
+                          sweep_s=sweep_ms / 1e3)
     start_ns = int(path.stat().st_mtime * 1e9)
     session_id = f"can-{path.stem}-{datetime.now(UTC):%Y%m%dT%H%M%S}Z"
     src = SoundcardSource(path, session_id, start_ns, cfg)

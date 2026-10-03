@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from upchirp.cli import app
 from upchirp.config import ArrayConfig
 from upchirp.dsp.detect import Detector
+from upchirp.frame import Frame
 from upchirp.recording import read_manifest, resolve_session
 from upchirp.replay import process_session
 from upchirp.sim.coffeecan import CanTarget, write_recording
@@ -51,3 +52,15 @@ def test_import_wav_then_replay(tmp_path: Path) -> None:
     assert read_manifest(session_dir)["source"] == "soundcard"
     summary = process_session(session_dir)
     assert summary["frames"] == 6
+
+
+def test_processor_rebuilds_the_exact_chirp_config() -> None:
+    from upchirp.services import chirp_config_for
+    from upchirp.sources.soundcard import CoffeeCanConfig
+
+    cfg = CoffeeCanConfig(f_start_hz=5.8e9, bandwidth_hz=123.4e6, sweep_s=0.04)
+    chirp = cfg.chirp_config(44_100.0)  # 44.1 kHz used to round to 44 kHz
+    frame = Frame.from_cube(np.zeros((1, chirp.n_chirps, chirp.n_samples), np.complex64),
+                            source="soundcard", session_id="s", frame_index=0, timestamp_ns=0,
+                            chirp_config_id=chirp.id, stage="raw")
+    assert chirp_config_for(frame) == chirp
