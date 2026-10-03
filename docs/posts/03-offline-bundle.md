@@ -13,7 +13,7 @@ Hosted vs local, same eval:
 | | Local (Qwen2.5 7B, CPU) | Hosted (Claude) |
 | --- | --- | --- |
 | Correct | 10 of 10 | (to measure) |
-| Latency p95 | 16.8 s | (to measure) |
+| Latency p95 | 16.2 s | (to measure) |
 | Cost per answer | $0 | (to measure) |
 
 Lesson: test the offline path offline. "It works on my machine" usually means "it works with my machine's internet".
