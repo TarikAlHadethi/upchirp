@@ -30,11 +30,24 @@ echo "== k3s $K3S_VERSION"
 K3S_URL="https://github.com/k3s-io/k3s/releases/download/${K3S_VERSION/+/%2B}"
 curl -fsSL -o "$OUT/k3s/k3s" "$K3S_URL/k3s"
 curl -fsSL -o "$OUT/k3s/k3s-airgap-images-amd64.tar.zst" "$K3S_URL/k3s-airgap-images-amd64.tar.zst"
-curl -fsSL -o "$OUT/k3s/install-k3s.sh" https://get.k3s.io
+# check both against the release's own checksums
+SUMS=$(curl -fsSL "$K3S_URL/sha256sum-amd64.txt")
+for f in k3s k3s-airgap-images-amd64.tar.zst; do
+  want=$(echo "$SUMS" | awk -v f="$f" '$2 == f {print $1}')
+  [ -n "$want" ] || { echo "no checksum for $f in the k3s release"; exit 1; }
+  echo "$want  $OUT/k3s/$f" | sha256sum -c --quiet - || { echo "checksum mismatch: $f"; exit 1; }
+done
+# the installer script from the same release tag, not whatever get.k3s.io serves today
+curl -fsSL -o "$OUT/k3s/install-k3s.sh" \
+  "https://raw.githubusercontent.com/k3s-io/k3s/$K3S_VERSION/install.sh"
 
 echo "== helm $HELM_VERSION"
-curl -fsSL "https://get.helm.sh/helm-$HELM_VERSION-linux-amd64.tar.gz" \
-  | tar -xzf - -C "$OUT/bin" --strip-components=1 linux-amd64/helm
+HELM_TGZ="helm-$HELM_VERSION-linux-amd64.tar.gz"
+curl -fsSL -o "$OUT/$HELM_TGZ" "https://get.helm.sh/$HELM_TGZ"
+echo "$(curl -fsSL "https://get.helm.sh/$HELM_TGZ.sha256sum" | awk '{print $1}')  $OUT/$HELM_TGZ" \
+  | sha256sum -c --quiet - || { echo "checksum mismatch: $HELM_TGZ"; exit 1; }
+tar -xzf "$OUT/$HELM_TGZ" -C "$OUT/bin" --strip-components=1 linux-amd64/helm
+rm "$OUT/$HELM_TGZ"
 
 echo "== images"
 if [ "${REUSE_IMAGES:-0}" = 1 ] && [ -s "$OUT/images/upchirp-images.tar.zst" ]; then
@@ -73,3 +86,6 @@ chmod +x "$OUT"/*.sh "$OUT/k3s/k3s" "$OUT/k3s/install-k3s.sh" "$OUT/bin/helm"
 (cd "$OUT" && find . -type f ! -name SHA256SUMS | sort | xargs sha256sum > SHA256SUMS)
 du -sh "$OUT"
 echo "Bundle ready: $OUT"
+# SHA256SUMS inside the bundle catches damage, not a deliberate change to the whole folder.
+# Publish this line somewhere else (the release notes) so an installer can check the list too.
+echo "Publish with the release: $(sha256sum "$OUT/SHA256SUMS" | awk '{print $1}')  SHA256SUMS"

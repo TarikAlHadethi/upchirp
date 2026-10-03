@@ -21,7 +21,7 @@ You do not need the internet, Docker, or any other software.
    sudo ./install.sh
    ```
 
-The installer goes through six steps and prints each one. It checks every file in the bundle against `SHA256SUMS` first, and stops if anything is damaged or was changed. Do not skip that check.
+The installer goes through six steps and prints each one. It checks every file in the bundle against `SHA256SUMS` first, and stops if anything is damaged or was changed. Do not skip that check. To be sure the list itself is genuine, compare `sha256sum SHA256SUMS` with the value published in the release notes.
 
 When it finishes it prints two addresses:
 
