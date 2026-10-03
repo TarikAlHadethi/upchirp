@@ -130,3 +130,7 @@ Evals that need a model or the database skip when those are not running (as in C
 
 - **Tarik**: software, platform, agent, evals, deployment
 - **Abdullah**: RF hardware, FPGA, characterization
+
+## License
+
+MIT, see [`LICENSE`](LICENSE).

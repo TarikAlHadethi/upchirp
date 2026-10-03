@@ -3,6 +3,7 @@ name = "upchirp"
 version = "0.0.1"
 description = "Offline sensor data platform with an AI agent; FMCW radar as the sensor"
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = [
     "numpy",
     "scipy",
