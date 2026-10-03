@@ -69,7 +69,7 @@ make score
 
 ## Live view and chat
 
-Needs Docker and Node 20. Runs offline once the images and models are downloaded.
+Needs Docker and Node 22. Runs offline once the images and models are downloaded.
 
 ```
 make up      # Redpanda, PostgreSQL (TimescaleDB + pgvector), Ollama

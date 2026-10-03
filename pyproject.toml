@@ -58,8 +58,14 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["pyarrow", "pyarrow.*", "scipy", "scipy.*", "onnxruntime", "onnxruntime.*"]
+module = ["pyarrow", "pyarrow.*", "scipy", "scipy.*", "onnxruntime", "onnxruntime.*",
+          "torch", "torch.*"]
 ignore_missing_imports = true
+
+# CI does not install the ml extra (torch is large), so torch.nn.Module is Any there
+[[tool.mypy.overrides]]
+module = ["upchirp.classify.model"]
+disallow_subclassing_any = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "evals"]
