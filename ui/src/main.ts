@@ -85,7 +85,7 @@ function drawMap(): void {
   const scale = Math.min((h - 24) / MAP_RANGE_M, w / 2 / MAP_RANGE_M);
   if (!(scale > 0)) return; // not laid out yet
   const ox = w / 2;
-  const oy = h - 12;
+  const oy = h - 16; // room for the ring labels below the baseline
   const px = (x: number, y: number): [number, number] => [ox + x * scale, oy - y * scale];
 
   // field of view and range rings
@@ -93,12 +93,26 @@ function drawMap(): void {
   ctx.fillStyle = "#7d90a5"; // readable on the dark map (contrast above 4.5:1)
   ctx.font = "11px system-ui";
   ctx.lineWidth = 1;
+  // Ring labels sit on the right-hand baseline, where targets rarely are, not on the
+  // centre line where people walk; every 20 m when rings are too close for every 10 m.
+  const labelStep = 10 * scale < 34 ? 20 : 10;
+  let lastRight = -Infinity; // skip a label that would run into the one before it
+  ctx.textAlign = "center";
   for (let r = 10; r <= MAP_RANGE_M; r += 10) {
     ctx.beginPath();
     ctx.arc(ox, oy, r * scale, Math.PI, 2 * Math.PI);
     ctx.stroke();
-    ctx.fillText(`${r} m`, ox + 4, oy - r * scale + 12);
+    if (r % labelStep === 0) {
+      const text = `${r} m`;
+      const half = ctx.measureText(text).width / 2;
+      const x = Math.min(ox + r * scale, w - half - 2); // keep it on screen
+      if (x - half > lastRight + 4) {
+        ctx.fillText(text, x, oy + 13);
+        lastRight = x + half;
+      }
+    }
   }
+  ctx.textAlign = "start";
   for (const deg of [-60, -30, 0, 30, 60]) {
     const a = (deg * Math.PI) / 180;
     const [x, y] = px(MAP_RANGE_M * Math.sin(a), MAP_RANGE_M * Math.cos(a));
@@ -112,7 +126,8 @@ function drawMap(): void {
   ctx.arc(ox, oy, 5, 0, 2 * Math.PI);
   ctx.fill();
 
-  // trails, then tracks
+  // trails, then tracks; a label that would overlap one already drawn moves down a line
+  const placed: Array<[number, number, number]> = []; // x, y, width of each label
   for (const t of tracks) {
     const color = COLORS[t.label] ?? COLORS.unknown;
     const trail = trails.get(t.track_id) ?? [];
@@ -132,7 +147,14 @@ function drawMap(): void {
     ctx.arc(a, b, t.label === "car" ? 7 : 5.5, 0, 2 * Math.PI);
     ctx.fill();
     ctx.fillStyle = "#dbe6f0";
-    ctx.fillText(`${t.track_id} ${LABEL_TEXT[t.label] ?? ""}`, a + 9, b + 4);
+    const text = `${t.track_id} ${LABEL_TEXT[t.label] ?? ""}`;
+    const tw = ctx.measureText(text).width;
+    let ly = b + 4;
+    while (placed.some(([x, y, pw]) => Math.abs(y - ly) < 13 && a + 9 < x + pw && x < a + 9 + tw)) {
+      ly += 13;
+    }
+    placed.push([a + 9, ly, tw]);
+    ctx.fillText(text, a + 9, ly);
   }
 }
 
@@ -239,7 +261,7 @@ function renderTable(): void {
           [String(t.track_id), false],
           [LABEL_TEXT[t.label] ?? t.label, false],
           [`${t.range_m.toFixed(1)} m`, true],
-          [`${t.azimuth_deg.toFixed(0)}°`, true],
+          [`${Math.round(t.azimuth_deg) || 0}°`, true], // || 0: no "-0°"
           [`${t.speed_mps.toFixed(1)} m/s`, true],
         ];
         for (const [text, num] of cells) {
@@ -252,6 +274,17 @@ function renderTable(): void {
         return tr;
       }),
   );
+  if (tracks.length === 0) {
+    // say why the table is empty instead of leaving it blank
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 5;
+    td.className = "muted";
+    td.textContent = "Nothing tracked right now. A track is confirmed after a few frames; " +
+      "at the start of a run the radar first learns the empty scene (about 2 s).";
+    tr.append(td);
+    body.append(tr);
+  }
   $("track-count").textContent = `${tracks.length} confirmed`;
 }
 
