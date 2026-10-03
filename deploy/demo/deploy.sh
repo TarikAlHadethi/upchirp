@@ -3,7 +3,7 @@
 # (through SSM, no SSH) to run server-setup.sh. Needs `aws login --profile upchirp`.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-REGION=eu-central-1
+REGION=eu-north-1
 AWS=(aws --profile upchirp --region "$REGION")
 BUCKET=$(terraform -chdir=infra output -raw bucket)
 INSTANCE=$(terraform -chdir=infra output -raw instance_id)

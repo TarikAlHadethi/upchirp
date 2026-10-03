@@ -3,7 +3,7 @@
 # (through SSM). Installs Docker, fetches the release from S3, and (re)starts the stack.
 set -euo pipefail
 BUCKET="$1"
-REGION="${2:-eu-central-1}"
+REGION="${2:-eu-north-1}"
 APP=/opt/upchirp
 COMPOSE_VERSION=v5.6.0
 COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2

@@ -1,7 +1,7 @@
 variable "region" {
-  description = "Frankfurt: nearest region with Claude on Bedrock (checked 3 October 2026)"
+  description = "Stockholm: the account's plan allows EC2 and Bedrock there, not in Frankfurt (checked 3 October 2026)"
   type        = string
-  default     = "eu-central-1"
+  default     = "eu-north-1"
 }
 
 variable "aws_profile" {
@@ -21,7 +21,7 @@ variable "monthly_budget_usd" {
 }
 
 variable "instance_type" {
-  description = "t4g.small: 2 vCPU ARM, 2 GB RAM, $0.0192 per hour in Frankfurt"
+  description = "t4g.small: 2 vCPU ARM, 2 GB RAM"
   type        = string
   default     = "t4g.small"
 }

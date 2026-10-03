@@ -1,4 +1,4 @@
-# Step 6: the public demo. One small ARM server in Frankfurt running the platform in replay
+# Step 6: the public demo. One small ARM server in Stockholm running the platform in replay
 # mode, a private bucket for releases, least-privilege roles, and a monthly budget alarm.
 # No SSH and no keys: the server is reached through SSM, and calls Bedrock with its role.
 

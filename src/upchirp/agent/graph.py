@@ -114,7 +114,7 @@ def make_model() -> BaseChatModel:
         return ChatBedrockConverse(
             model_id=model_id(),
             provider="anthropic",
-            region_name=os.environ.get("AWS_REGION", "eu-central-1"),
+            region_name=os.environ.get("AWS_REGION", "eu-north-1"),
             max_tokens=4000,
         )
     if provider == "anthropic":
