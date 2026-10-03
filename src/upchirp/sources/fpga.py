@@ -108,6 +108,7 @@ class Reassembler:
 
     session_id: str
     chirp: ChirpConfig
+    n_rx: int | None = None  # receive channels expected; None takes the first packet's
     max_open: int = 2
     frames_out: int = 0
     frames_dropped: int = 0
@@ -124,14 +125,23 @@ class Reassembler:
         if (p.n_chirps, p.n_samples) != (self.chirp.n_chirps, self.chirp.n_samples):
             self.bad_packets += 1  # the FPGA runs a different chirp config than we expect
             return None
+        if self.n_rx is None:
+            self.n_rx = p.n_rx
+        if p.n_rx != self.n_rx:
+            self.bad_packets += 1  # would not fit the frames being built
+            return None
         key = (p.frame_counter, p.rx, p.chirp, p.offset)
         if key in self._seen:
             return None  # a duplicate
         partial = self._open.get(p.frame_counter)
         if partial is None:
             if self._open and p.frame_counter < min(self._open):
-                self.bad_packets += 1  # a late packet for a frame already given up
-                return None
+                if min(self._open) - p.frame_counter <= self.max_open:
+                    self.bad_packets += 1  # a late packet for a frame already given up
+                    return None
+                # far behind: the FPGA restarted and counts from 0 again
+                for counter in list(self._open):
+                    self._drop(counter)
             partial = _Partial(p, received_ns or time.time_ns(),
                                np.zeros((p.n_rx, p.n_chirps, p.n_samples), np.complex64))
             self._open[p.frame_counter] = partial
@@ -170,9 +180,9 @@ class FpgaSource:
 
     def __init__(self, session_id: str, chirp: ChirpConfig | None = None,
                  host: str = "0.0.0.0", port: int = 4991,
-                 idle_timeout_s: float | None = None) -> None:
+                 idle_timeout_s: float | None = None, n_rx: int | None = None) -> None:
         self.chirp = chirp or ChirpConfig()
-        self.reassembler = Reassembler(session_id, self.chirp)
+        self.reassembler = Reassembler(session_id, self.chirp, n_rx=n_rx)
         self.host, self.port = host, port
         self.idle_timeout_s = idle_timeout_s
 

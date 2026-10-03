@@ -98,3 +98,23 @@ def test_fake_fpga_over_udp_gives_frames_the_detector_can_use() -> None:
     det = Detector(CHIRP, ArrayConfig())
     found = [det.detect(f) for f in received]
     assert sum(len(d) > 0 for d in found[20:]) >= len(found[20:]) - 1
+
+
+def test_fpga_restart_is_followed() -> None:
+    r = Reassembler("s", CHIRP)
+    before = encode_packets(_cube(0), 1000)
+    del before[3]  # frame 1000 never completes
+    for p in before:
+        r.feed(p)
+    after = [f for p in encode_packets(_cube(1), 0) + encode_packets(_cube(2), 1)
+             if (f := r.feed(p)) is not None]
+    assert [f.meta["fpga_frame_counter"] for f in after] == [0, 1]
+    assert r.frames_dropped == 1
+
+
+def test_packet_with_other_channel_count_is_rejected() -> None:
+    r = Reassembler("s", CHIRP)
+    r.feed(encode_packets(_cube()[:1], 7)[0])  # one channel opens frame 7
+    stray = encode_packets(np.zeros((4, CHIRP.n_chirps, CHIRP.n_samples), np.complex64), 7)
+    assert r.feed(stray[-1]) is None  # rx 3 of 4: would not fit, must not crash
+    assert r.bad_packets == 1
