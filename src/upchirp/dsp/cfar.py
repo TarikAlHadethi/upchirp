@@ -68,6 +68,26 @@ def threshold(power: npt.NDArray[np.floating[Any]], cfg: CfarConfig) -> npt.NDAr
     return out
 
 
+def _threshold_at(power: npt.NDArray[np.floating[Any]], cfg: CfarConfig,
+                  cells: npt.NDArray[np.intp]) -> npt.NDArray[np.float64]:
+    """The same threshold as `threshold`, computed only at these (doppler, range) cells.
+
+    A detection must be a local maximum, which only a few percent of cells are, so this
+    is about ten times faster than ranking the training cells around every cell."""
+    fp = _footprint(cfg)
+    n = int(fp.sum())
+    k = max(1, int(cfg.rank * n))
+    d, r = fp.shape[0] // 2, fp.shape[1] // 2
+    padded = _pad(power, d, r)
+    od, orr = np.nonzero(fp)  # training cell offsets inside the window
+    rows = cells[:, :1] + od[None, :]
+    cols = cells[:, 1:] + orr[None, :]
+    train = padded[rows, cols]
+    kth = np.partition(train, k - 1, axis=1)[:, k - 1]
+    out: npt.NDArray[np.float64] = os_cfar_alpha(n, k, cfg.pfa) * kth
+    return out
+
+
 def detect_peaks(
     power: npt.NDArray[np.floating[Any]], cfg: CfarConfig,
     floor: npt.NDArray[np.floating[Any]] | None = None,
@@ -75,14 +95,16 @@ def detect_peaks(
     """(doppler_bin, range_bin) of cells over threshold that are local maxima.
 
     `floor` is an extra per-cell minimum, such as a clutter power map's."""
-    limit = threshold(power, cfg)
-    if floor is not None:
-        limit = np.maximum(limit, floor)
-    above = power > limit
     d, r = cfg.peak_size[0] // 2, cfg.peak_size[1] // 2
     local_max = _crop(
         ndimage.maximum_filter(_pad(power, d, r), size=cfg.peak_size, mode="constant"), d, r
     )
-    peaks = above & (power == local_max)
-    peaks[:, : cfg.min_range_bin] = False
-    return [(int(a), int(b)) for a, b in np.argwhere(peaks)]
+    candidate = power == local_max
+    candidate[:, : cfg.min_range_bin] = False
+    if floor is not None:
+        candidate &= power > floor
+    cells = np.argwhere(candidate)
+    if len(cells) == 0:
+        return []
+    above = power[cells[:, 0], cells[:, 1]] > _threshold_at(power, cfg, cells)
+    return [(int(a), int(b)) for a, b in cells[above]]

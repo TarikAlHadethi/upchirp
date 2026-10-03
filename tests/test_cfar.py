@@ -54,3 +54,14 @@ def test_detection_accuracy() -> None:
     assert det.radial_velocity_mps == pytest.approx(0.0, abs=0.1)
     assert det.azimuth_deg == pytest.approx(25.0, abs=1.0)
     assert det.snr_db > 30
+
+
+def test_threshold_at_peaks_matches_the_full_map() -> None:
+    from upchirp.dsp.cfar import _threshold_at
+
+    rng = np.random.default_rng(3)
+    power = rng.exponential(1.0, (64, 256)) * (1 + 5 * rng.random((64, 256)))
+    power[rng.integers(0, 64, 30), rng.integers(0, 256, 30)] *= 1e3
+    cells = np.argwhere(np.ones(power.shape, dtype=bool))
+    fast = _threshold_at(power, CfarConfig(), cells).reshape(power.shape)
+    assert np.allclose(fast, threshold(power, CfarConfig()))
