@@ -11,6 +11,7 @@ loop), so track ids never collide.
 
 import base64
 import json
+import logging
 import time
 import uuid
 from collections.abc import Iterable
@@ -24,6 +25,8 @@ from upchirp.config import ArrayConfig, ChirpConfig
 from upchirp.frame import Frame, from_wire, to_wire
 from upchirp.pipeline import Pipeline
 
+log = logging.getLogger(__name__)
+
 CHIRP_CONFIGS = {c.id: c for c in (ChirpConfig(),)}
 
 
@@ -31,7 +34,12 @@ def chirp_config_for(frame: Frame) -> ChirpConfig:
     """Known configs by id; coffee-can configs are rebuilt from their id."""
     if frame.chirp_config_id in CHIRP_CONFIGS:
         return CHIRP_CONFIGS[frame.chirp_config_id]
-    if frame.chirp_config_id.startswith("coffee-can-"):
+    if frame.chirp_config_id.startswith("coffee-can-v1:"):
+        from upchirp.sources.soundcard import config_from_id
+
+        cfg, fs = config_from_id(frame.chirp_config_id)
+        return cfg.chirp_config(fs)
+    if frame.chirp_config_id.startswith("coffee-can-"):  # older recordings: rounded settings
         from upchirp.sources.soundcard import CoffeeCanConfig
 
         _, _, mhz, khz = frame.chirp_config_id.split("-")
@@ -129,7 +137,12 @@ def run_processor(from_start: bool = False, max_idle_s: float | None = None) -> 
                     return
                 continue
             idle_since = time.monotonic()
-            proc.handle(from_wire(item[1]))
+            try:
+                frame = from_wire(item[1])
+                proc.handle(frame)
+            except (ValueError, KeyError) as e:  # one bad frame must not stop the stream
+                metrics.BAD_MESSAGES.labels("processor").inc()
+                log.warning("skipped an unreadable frame: %s", e)
     finally:
         proc.prod.flush(10)
         cons.close()
@@ -142,7 +155,8 @@ def run_writer(from_start: bool = False, max_idle_s: float | None = None) -> Non
     stream.ensure_topics()
     conn = store.connect_waiting()
     store.init_schema(conn)
-    cons = stream.consumer("upchirp-writer", [stream.DETECTIONS, stream.TRACKS], from_start)
+    cons = stream.consumer("upchirp-writer", [stream.DETECTIONS, stream.TRACKS], from_start,
+                           manual_store=True)
     pending: list[tuple[str, dict[str, Any]]] = []
     idle_since = time.monotonic()
 
@@ -163,6 +177,7 @@ def run_writer(from_start: bool = False, max_idle_s: float | None = None) -> Non
                         store.insert_tracks(conn, msg["run_id"], confirmed)
                         metrics.ROWS_WRITTEN.labels("tracks").inc(len(confirmed))
         pending.clear()
+        stream.mark_done(cons)  # only now: a crash before this re-reads the batch
 
     try:
         for item in stream.messages(cons):
@@ -172,7 +187,17 @@ def run_writer(from_start: bool = False, max_idle_s: float | None = None) -> Non
                     return
                 continue
             idle_since = time.monotonic()
-            pending.append((item[0], json.loads(item[1])))
+            try:
+                msg = json.loads(item[1])
+                needed = ("run_id", "session_id", "source", "timestamp_ns",
+                          "detections" if item[0] == stream.DETECTIONS else "tracks")
+                if not isinstance(msg, dict) or any(k not in msg for k in needed):
+                    raise ValueError("missing fields")
+            except ValueError as e:  # json errors are ValueErrors too
+                metrics.BAD_MESSAGES.labels("writer").inc()
+                log.warning("skipped an unreadable message: %s", e)
+                continue
+            pending.append((item[0], msg))
             if len(pending) >= 50:
                 flush()
     finally:

@@ -18,6 +18,8 @@ ROWS_WRITTEN = Counter("upchirp_rows_written_total", "Rows written to Postgres",
 QUESTIONS = Counter("upchirp_agent_questions_total", "Questions to the agent", ["outcome"])
 ANSWER_SECONDS = Histogram("upchirp_agent_answer_seconds", "Time to answer a question",
                            buckets=(1, 2, 5, 10, 20, 30, 60, 120))
+BAD_MESSAGES = Counter("upchirp_bad_messages_total", "Stream messages skipped as unreadable",
+                       ["service"])
 LIVE_CLIENTS = Gauge("upchirp_live_clients", "Browsers on the live view")
 
 

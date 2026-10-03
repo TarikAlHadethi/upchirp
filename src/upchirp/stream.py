@@ -53,16 +53,27 @@ def producer() -> Producer:
     })
 
 
-def consumer(group: str, topics: list[str], from_start: bool = False) -> Consumer:
+def consumer(group: str, topics: list[str], from_start: bool = False,
+             manual_store: bool = False) -> Consumer:
+    """manual_store: offsets are only committed after the caller calls mark_done, so
+    messages it was still holding are read again after a crash."""
     c = Consumer({
         "bootstrap.servers": bootstrap(),
         "group.id": prefix() + group,
         "auto.offset.reset": "earliest" if from_start else "latest",
         "enable.auto.commit": True,
+        "enable.auto.offset.store": not manual_store,
         "fetch.max.bytes": 50_000_000,
     })
     c.subscribe([topic(t) for t in topics])
     return c
+
+
+def mark_done(c: Consumer) -> None:
+    """Every message polled so far is handled: let its offset be committed."""
+    done = [tp for tp in c.position(c.assignment()) if tp.offset >= 0]
+    if done:
+        c.store_offsets(offsets=done)
 
 
 def messages(c: Consumer, timeout_s: float = 0.5) -> Iterator[tuple[str, bytes] | None]:
