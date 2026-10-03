@@ -165,7 +165,7 @@ def track_summaries(
     for s in states:
         by_track.setdefault(s.track_id, []).append(s)
 
-    tracks = []
+    tracks: list[dict[str, Any]] = []
     for track_id, piece_ids in sorted(stitch(by_track).items()):
         hist = sorted((s for tid in piece_ids for s in by_track[tid]),
                       key=lambda s: s.timestamp_ns)
@@ -199,6 +199,11 @@ def track_summaries(
         },
         "label_filter": label,
         "track_count": len(tracks),
+        # the answer to "which came closest", worked out here so a small model only has
+        # to copy it, not search the list for the minimum
+        "closest": None if not tracks else {
+            k: c[k] for c in [min(tracks, key=lambda t: t["closest_range_m"])]
+            for k in ("track_id", "label", "closest_range_m", "closest_at_s_after_start")},
         "tracks": tracks,
     }
 

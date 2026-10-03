@@ -27,6 +27,9 @@ def test_track_summaries(processed: tuple[Path, Path]) -> None:
     drones = data.track_summaries(data_dir, label="drone_like")
     assert drones["track_count"] == 1
     assert 50 < drones["tracks"][0]["closest_range_m"] < 65
+    nearest = min(everything["tracks"], key=lambda t: t["closest_range_m"])
+    assert everything["closest"]["track_id"] == nearest["track_id"]
+    assert everything["closest"]["closest_range_m"] == nearest["closest_range_m"]
 
 
 def test_time_window(processed: tuple[Path, Path]) -> None:

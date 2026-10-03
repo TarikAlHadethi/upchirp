@@ -45,6 +45,8 @@ The tracking eval used two noise seeds per scene. Run on seeds 0 to 11 of both s
 
 The first 15-minute run counted 24 drone-like objects where there were 4: one drone hovering beside a tree broke into 20 pieces (a known limit), and stitching could not join short pieces. After the changes in decision 0014, three layouts give 4 of 4 every time. It also showed a new limit: a person crossing the view at a tree's range is hidden while their radial speed is near zero.
 
+Then the real thing: the live system on the courtyard for 12 minutes, the headline question asked through the live view. The agent said 4 drone-like tracks for 3, and named the wrong one as closest. Causes: a person briefly labelled drone-like after 3 fluctuating echoes, and the small model misreading a list. A drone-like label now needs 1 s of echoes, and the track tool states the closest track itself; over 8 more noise seeds the count is right every time (decision 0014, update).
+
 ## Offline install
 
 The bundle rebuilt with all of the above (k3s and Helm now checked against their release checksums) installed on a fresh Ubuntu 24.04 machine with no network in 4.5 minutes. Every pod ran (application pods now as a non-root user, every workload with a memory limit, Grafana view only), and the agent answered the drone question correctly.

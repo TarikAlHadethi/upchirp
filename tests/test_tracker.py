@@ -100,3 +100,21 @@ def test_people_side_by_side_keep_two_tracks() -> None:
         frames.append([left, right])
     tracker = _run(frames)
     assert len([s for s in tracker.states("t", 39) if s.confirmed]) == 2
+
+
+def test_drone_like_label_needs_ten_detections() -> None:
+    from upchirp.classify.rules import RuleLabeler
+    from upchirp.dsp.detect import Detection
+
+    def det(snr: float) -> Detection:  # at 50 m: snr 40 dB is about -10.2 dBsm
+        return Detection("s", 0, 0, 50.0, 1.0, 0.0, snr, 50, 32)
+
+    lab = RuleLabeler()
+    for i in range(9):
+        lab.observe(1, det(40.0))
+        lab.observe(2, det(80.0))  # about +30 dBsm: a car at once
+        if i >= 2:
+            assert lab.label(1)[0] == "unknown"
+            assert lab.label(2)[0] == "car"
+    lab.observe(1, det(40.0))
+    assert lab.label(1)[0] == "drone_like"

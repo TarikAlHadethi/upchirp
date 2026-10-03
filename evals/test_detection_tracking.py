@@ -43,7 +43,8 @@ MIN_TRACK_COVERAGE = 0.95
 MAX_ID_SWITCHES = 2
 MAX_FALSE_TRACKS_PER_FRAME = 0.05
 MAX_TRACK_POSITION_RMSE_M = {"person": 0.5, "car": 0.5, "drone_like": 1.25}
-MIN_LABEL_ACCURACY = 0.95
+MIN_LABEL_ACCURACY = 0.95  # of the frames with a label
+MIN_LABELLED_SHARE = 0.8  # labels wait for evidence: 1 s for drone-like (decision 0014)
 
 
 def run(scene: str | Scene, seed: int, pipeline_cls: type[Pipeline] = Pipeline
@@ -81,6 +82,8 @@ def failures(det: DetectionScore, trk: TrackScore) -> list[str]:
             out.append(f"{t.target_id} position RMSE {t.position_rmse_m:.3f}")
         if t.label_accuracy < MIN_LABEL_ACCURACY:
             out.append(f"{t.target_id} label right {t.label_accuracy:.3f} < {MIN_LABEL_ACCURACY}")
+        if t.labelled_share < MIN_LABELLED_SHARE:
+            out.append(f"{t.target_id} labelled {t.labelled_share:.3f} < {MIN_LABELLED_SHARE}")
     return out
 
 

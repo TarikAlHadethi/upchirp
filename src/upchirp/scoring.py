@@ -125,6 +125,7 @@ class TargetTrackScore:
     n_tracked: int = 0
     id_switches: int = 0
     n_label_correct: int = 0
+    n_labelled: int = 0  # tracked frames whose track had a label (not "unknown")
     track_ids: set[int] = field(default_factory=set)
     errors_m: list[float] = field(default_factory=list)
 
@@ -138,8 +139,14 @@ class TargetTrackScore:
 
     @property
     def label_accuracy(self) -> float:
-        """Share of tracked frames where the track carried the right label."""
-        return self.n_label_correct / self.n_tracked if self.n_tracked else float("nan")
+        """Of the tracked frames whose track had a label, the share where it was right."""
+        return self.n_label_correct / self.n_labelled if self.n_labelled else float("nan")
+
+    @property
+    def labelled_share(self) -> float:
+        """Share of tracked frames with a label. A new track says "unknown" until it is
+        sure (a drone-like label needs 1 s of echoes): holding back is not a wrong label."""
+        return self.n_labelled / self.n_tracked if self.n_tracked else float("nan")
 
 
 @dataclass
@@ -189,6 +196,7 @@ def score_tracks(
                     score = per_target[t.target_id]
                     score.n_tracked += 1
                     score.n_label_correct += s.label == t.label
+                    score.n_labelled += s.label != "unknown"
                     score.errors_m.append(float(dist[i, j]))
                     score.track_ids.add(s.track_id)
                     if t.target_id in last_id and last_id[t.target_id] != s.track_id:
@@ -211,7 +219,7 @@ def format_report(det: DetectionScore, trk: TrackScore) -> str:
         "Tracks",
         *(f"  {t.target_id:<12} {t.label:<11} tracked {t.coverage:.1%} of frames, "
           f"track ids {sorted(t.track_ids)}, position error {t.position_rmse_m:.2f} m, "
-          f"label right {t.label_accuracy:.1%}"
+          f"label right {t.label_accuracy:.1%} of {t.labelled_share:.0%} labelled"
           for t in trk.per_target.values()),
         f"  id switches             {trk.id_switches}",
         f"  false tracks per frame  {trk.false_tracks_per_frame:.3f}",

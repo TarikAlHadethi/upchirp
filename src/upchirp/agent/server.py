@@ -112,6 +112,7 @@ def get_tracks(
     label: person, car, drone_like or unknown; leave empty for all.
     last_minutes: only the last N minutes before the newest data; leave empty for all.
     Each track gives first and last seen time, closest range and when, and speeds.
+    `closest` is the track that came closest of all those returned.
     """
     return data.track_summaries(
         data_dir(), _session(session_id), _optional(label), _optional(last_minutes)

@@ -30,6 +30,11 @@ class RuleConfig:
     car_min_dbsm: float = 5.0
     drone_max_dbsm: float = -10.0
     min_detections: int = 3
+    # Drone-like is the label people act on, so it needs more evidence: a person's echo
+    # fluctuates (Swerling 1), and the median of only 3 estimates falls 10 dB under its
+    # mean about 2.5% of the time; of 10, about once in 10,000. Until then the
+    # track stays unknown (decision 0014).
+    min_detections_drone: int = 10
     history: int = 20
 
 
@@ -64,4 +69,7 @@ class RuleLabeler:
         rcs = float(np.median(hist))
         if len(hist) < self.cfg.min_detections:
             return UNKNOWN, rcs
-        return label_for(rcs, self.cfg), rcs
+        label = label_for(rcs, self.cfg)
+        if label == "drone_like" and len(hist) < self.cfg.min_detections_drone:
+            return UNKNOWN, rcs
+        return label, rcs
