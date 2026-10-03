@@ -140,3 +140,18 @@ def test_public_api_refuses_approvals(tmp_path: Path, monkeypatch: pytest.Monkey
     app = TestClient(create_app(tmp_path, live=False, public=True))
     assert app.get("/api/health").json()["public"] is True
     assert app.post("/api/ask/x/decision", json={"approve": True}).status_code == 403
+
+
+def test_public_live_view_caps_viewers_per_address(tmp_path: Path,
+                                                    monkeypatch: pytest.MonkeyPatch) -> None:
+    from starlette.websockets import WebSocketDisconnect
+
+    monkeypatch.delenv("UPCHIRP_DATABASE_URL", raising=False)
+    monkeypatch.setenv("UPCHIRP_MAX_LIVE_PER_ADDRESS", "2")
+    client = TestClient(create_app(tmp_path, live=False, public=True))
+    with client.websocket_connect("/ws/live"), client.websocket_connect("/ws/live"):
+        assert client.get("/api/health").json()["live_clients"] == 2
+        with pytest.raises(WebSocketDisconnect) as e, client.websocket_connect("/ws/live"):
+            pass
+        assert e.value.code == 1013
+    assert client.get("/api/health").json()["live_clients"] == 0  # both left cleanly

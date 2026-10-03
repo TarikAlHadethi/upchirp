@@ -22,7 +22,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -201,19 +201,46 @@ def create_app(data_dir: Path, live: bool = True, public: bool | None = None) ->
             raise HTTPException(403, "Nothing to approve on the public demo.")
         return _turn(await agent().resume(thread_id, d.approve))
 
+    # Public demo: cap live viewers in total and per address, so nobody can tie the
+    # server up by opening connections. The edge box has no caps (its users are trusted).
+    max_viewers = int(os.environ.get("UPCHIRP_MAX_LIVE_VIEWERS", "200"))
+    max_per_address = int(os.environ.get("UPCHIRP_MAX_LIVE_PER_ADDRESS", "5"))
+    per_address: dict[str, int] = {}
+
     @app.websocket("/ws/live")
     async def live_ws(ws: WebSocket) -> None:
+        visitor = ws.client.host if ws.client else "unknown"
+        if public and (len(broadcaster.clients) >= max_viewers
+                       or per_address.get(visitor, 0) >= max_per_address):
+            await ws.close(code=1013, reason="Too many live viewers; try again later.")
+            return
         await ws.accept()
         q: asyncio.Queue[str] = asyncio.Queue(maxsize=30)
         broadcaster.clients.add(q)
+        per_address[visitor] = per_address.get(visitor, 0) + 1
         metrics.LIVE_CLIENTS.set(len(broadcaster.clients))
-        try:
+        async def pump() -> None:
             while True:
                 await ws.send_text(await q.get())
-        except WebSocketDisconnect:
-            pass
+
+        async def watch() -> None:
+            # notices a browser leaving even while no live data flows (broker down)
+            while (await ws.receive())["type"] != "websocket.disconnect":
+                pass
+
+        tasks = {asyncio.create_task(pump()), asyncio.create_task(watch())}
+        try:
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            for t in done:
+                if not t.cancelled():
+                    t.exception()  # a failed send means the browser left: nothing to report
         finally:
+            for t in tasks:
+                t.cancel()
             broadcaster.clients.discard(q)
+            per_address[visitor] -= 1
+            if per_address[visitor] <= 0:
+                del per_address[visitor]
             metrics.LIVE_CLIENTS.set(len(broadcaster.clients))
 
     if UI_DIST.exists():
