@@ -42,12 +42,22 @@ def moving_parts(target: Target, t: npt.NDArray[np.float64], vel: npt.NDArray[np
     rotor speeds) comes from its id, so a scene looks the same on every run."""
     own = np.random.default_rng(zlib.crc32(target.id.encode()))
     speed = float(np.linalg.norm(vel))
+    along = aspect(target.position_at(float(t[0])), vel)
     if target.label == "person":
-        return person_parts(t, speed, own.uniform(0, 2 * np.pi))
+        return person_parts(t, speed, own.uniform(0, 2 * np.pi), along)
     if target.label == "car":
         body = car_extent(target, t, vel) if target.extended else []
-        return body + car_parts(t, speed, rng)
+        return body + car_parts(t, speed, rng, along)
     return drone_parts(t, own)
+
+
+def aspect(pos: npt.NDArray[np.float64], vel: npt.NDArray[np.float64]) -> float:
+    """|cos| of the angle between the direction of travel and the line of sight:
+    1 coming straight at the radar or going away, 0 crossing the view."""
+    speed = float(np.linalg.norm(vel))
+    if speed < 1e-9:
+        return 0.0
+    return abs(float(vel @ pos)) / (speed * float(np.linalg.norm(pos)))
 
 
 CAR_LENGTH_M, CAR_WIDTH_M = 4.5, 1.8

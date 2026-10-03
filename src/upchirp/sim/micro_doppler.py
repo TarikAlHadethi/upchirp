@@ -9,6 +9,12 @@ Each part is returned as its offset along the line of sight at each chirp time,
 relative to the body, and its share of the target's radar cross section. The
 models are textbook simplifications (sinusoidal limb swing, uniform tyre points,
 rotating blade tips), not biomechanics.
+
+Limbs and tyre treads move along the direction of travel, so only the part of that
+motion along the line of sight shows up as Doppler: all of it for a target coming
+straight at the radar, almost none for one crossing the view (`along`, the cosine of
+the aspect angle). Vertical motion is ignored: the radar sits at about the targets'
+height, so it adds little along the line of sight.
 """
 
 from dataclasses import dataclass
@@ -25,7 +31,7 @@ class Part:
     rcs_fraction: float
 
 
-def person_parts(t: Array, speed_mps: float, phase0: float) -> list[Part]:
+def person_parts(t: Array, speed_mps: float, phase0: float, along: float = 1.0) -> list[Part]:
     """Two legs and two arms swinging at the gait rate (about 1.8 Hz at walking pace)."""
     if speed_mps < 0.2:
         return []
@@ -35,7 +41,7 @@ def person_parts(t: Array, speed_mps: float, phase0: float) -> list[Part]:
     # limbs together carry about a tenth of the torso's echo (about 10 dB below it)
     for amp_ratio, rcs, phase in ((1.2, 0.035, 0.0), (1.2, 0.035, np.pi),   # legs
                                   (0.7, 0.015, np.pi), (0.7, 0.015, 0.0)):  # arms
-        amp_v = amp_ratio * speed_mps  # peak speed of the limb relative to the body
+        amp_v = amp_ratio * speed_mps * along  # peak limb speed along the line of sight
         parts.append(Part(-(amp_v / w) * np.cos(w * t + phase + phase0), rcs))
     return parts
 
@@ -46,7 +52,8 @@ def car_body(extent_m: float) -> list[Part]:
                                                                      extent_m / 2, 5)]
 
 
-def car_parts(t: Array, speed_mps: float, rng: np.random.Generator) -> list[Part]:
+def car_parts(t: Array, speed_mps: float, rng: np.random.Generator,
+              along: float = 0.7) -> list[Part]:
     """Points on the visible tyres, moving at between 0 and 2 times the car's speed."""
     if speed_mps < 0.5:
         return []
@@ -56,8 +63,8 @@ def car_parts(t: Array, speed_mps: float, rng: np.random.Generator) -> list[Part
     for _ in range(6):
         angle = rng.uniform(0, 2 * np.pi)
         # tread point: forward speed v(1 - cos(angle)) relative to the ground, i.e.
-        # -v cos(angle) relative to the body; along the line of sight, scaled by 0.7
-        parts.append(Part(0.7 * radius * np.sin(w * t + angle), 0.01))
+        # -v cos(angle) relative to the body; only its share along the line of sight shows
+        parts.append(Part(along * radius * np.sin(w * t + angle), 0.01))
     return parts
 
 

@@ -45,9 +45,9 @@ All numbers come from the eval suite (`make evals`) on simulated scenes with kno
 
 | What | Result |
 | --- | --- |
-| Targets detected | people and cars 97 to 100% of frames; the drone-like target 93 to 100% (its rotors raise the background) |
-| False tracks | none on the crossing scene, at most 0.03 per frame on the default scene |
-| Track ID switches | none between two people passing within 3 m; a drone flying over a car can break its track, and the agent's tools stitch the pieces back |
+| Targets detected | people and cars 97 to 100% of frames; the drone-like target 92 to 99% (its rotors raise the background) |
+| False tracks | at most 0.01 per frame over the same 24 runs (none in 23 of them) |
+| Track ID switches | at most 1 per run over 24 runs (12 seeds of each scene), including two people passing within 3 m and a drone flying over a car; the agent's tools stitch any broken track back together |
 | Position error (RMS) | people and cars at most 0.5 m, the drone about 1 m |
 | Cars at their real size (4.5 m) | one track per car, from the echoes along its body; a drone flying low over a real-size car is a known limit |
 | Classifier on real radar data (RAD-DAR, unseen recordings) | 90%, with no measurable cost from converting to our radar's grid |

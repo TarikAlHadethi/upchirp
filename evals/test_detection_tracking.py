@@ -25,7 +25,8 @@ from upchirp.scoring import (
 from upchirp.sim.engine import Simulator
 from upchirp.sim.scene import Scene, get_scene
 
-CASES = [(scene, seed) for scene in ("default", "crossing") for seed in (0, 1)]
+# Four seeds per scene: on 3 October 2026 all gates held on seeds 0 to 11 of both scenes.
+CASES = [(scene, seed) for scene in ("default", "crossing") for seed in (0, 1, 2, 3)]
 
 MIN_PD = {"person": 0.97, "car": 0.97,
           # spinning rotors spread echo over every speed at the drone's range, raising

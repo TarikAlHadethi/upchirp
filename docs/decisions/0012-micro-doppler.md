@@ -29,3 +29,11 @@ Eval gates now differ by label, from measured results on four seeds: the drone i
 Because of those breaks, the agent's tools stitch track pieces into objects (`agent/data.py`): a piece that starts within 3 s after (or 0.5 s before) another of the same label ends, within 6 m of where that one was heading, is the same object. Without it the agent answered "3 drone-like tracks" for one drone. Tools report each object's `track_pieces`.
 
 Real targets also have size. The simulator can spread a car's body over its 4.5 m (`extended`), which took the classifier from 38% to 59% on simulated data (cars 86%, people 75%, drones 7%: real drone recordings are farther and noisier). Tracking a target that wide needs extended-object tracking, which is not built yet, so the tracking scenes keep point-sized bodies and only the classifier's patches use `extended`.
+
+## Update, 3 October 2026: micro-Doppler depends on the viewing angle
+
+Limbs and tyre treads move along the direction of travel, so only their motion along the line of sight shows up as Doppler: all of it for a target coming straight at the radar, almost none for one crossing the view. The simulator first used a fixed share (0.7 for tyres, 1 for limbs). Now the share is the cosine of the aspect angle (`sim/engine.py::aspect`).
+
+What it fixed: in the default scene the car crosses the view, and its tyres were smearing echo over every speed, including the drone's, when the drone flew over it. Run on seeds 0 to 11 of both scenes, ID switches fell from up to 5 per run (seed 9 failed its gates) to at most 1, and every gate held on all 24 runs. Simulated classifier accuracy is unchanged (60.5%).
+
+What it changed in scoring: the car driving away now shows its tyres' contact patch at 0 m/s, beside the hovering drone's range for a moment. The scorer had matched that tyre echo to the drone, 25 degrees away. A detection now has to be within 15 degrees of a target to count as its echo (`scoring.MATCH_AZIMUTH_DEG`); others count as part echoes or false alarms. The eval suite now runs four seeds per scene instead of two.

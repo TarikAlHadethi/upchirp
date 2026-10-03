@@ -23,6 +23,9 @@ from upchirp.sim.engine import TruthRow
 
 GATE_BINS = 2.0
 PART_AZIMUTH_DEG = 20.0  # part echoes are weak, so their angle is poor
+# A detection more than this far off in angle is not that target's echo, even at the right
+# range and speed (a car's tyre contact patch, at 0 m/s, beside a hovering drone).
+MATCH_AZIMUTH_DEG = 15.0
 
 
 def _rmse(errors: list[float]) -> float:
@@ -86,7 +89,9 @@ def score_detections(
                            for t in targets])
             dv = np.array([[(d.radial_velocity_mps - t.radial_velocity_mps)
                             / chirp.velocity_bin_mps for d in found] for t in targets])
-            inside = (np.abs(dr) <= GATE_BINS) & (np.abs(dv) <= GATE_BINS)
+            da = np.array([[d.azimuth_deg - t.azimuth_deg for d in found] for t in targets])
+            inside = ((np.abs(dr) <= GATE_BINS) & (np.abs(dv) <= GATE_BINS)
+                      & (np.abs(da) <= MATCH_AZIMUTH_DEG))
             cost = np.where(inside, dr**2 + dv**2, 1e9)
             for i, j in zip(*linear_sum_assignment(cost), strict=True):
                 if inside[i, j]:

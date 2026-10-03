@@ -72,8 +72,15 @@ def test_micro_doppler_spreads_the_echo() -> None:
         col = (np.abs(range_doppler(frame.cube())) ** 2).sum(0)[:, range_bin_of(ChirpConfig(), 30)]
         return int((10 * np.log10(col / col.max()) > -30).sum())
 
-    for label, vel in (("person", (1.3, 0.0, 0.0)), ("car", (0.0, -7.0, 0.0)),
+    for label, vel in (("person", (0.0, -1.3, 0.0)), ("car", (0.0, -7.0, 0.0)),
                        ("drone_like", (0.0, 0.0, 0.0))):
         plain = Target(id="t", label=label, position_m=(0, 30, 0), velocity_mps=vel, rcs_m2=1.0)
         moving = plain.model_copy(update={"micro_doppler": True})
         assert spread(moving) >= spread(plain) + 5, label
+
+    # wheels and limbs moving across the line of sight add almost no Doppler
+    for label, speed in (("person", 1.3), ("car", 7.0)):
+        across, toward = (Target(id="t", label=label, position_m=(0, 30, 0), velocity_mps=v,
+                                 rcs_m2=1.0, micro_doppler=True)
+                          for v in ((speed, 0.0, 0.0), (0.0, -speed, 0.0)))
+        assert spread(across) < spread(toward), label
