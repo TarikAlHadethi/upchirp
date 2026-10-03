@@ -90,7 +90,7 @@ function drawMap(): void {
 
   // field of view and range rings
   ctx.strokeStyle = "#1e2b3a";
-  ctx.fillStyle = "#4b5d70";
+  ctx.fillStyle = "#7d90a5"; // readable on the dark map (contrast above 4.5:1)
   ctx.font = "11px system-ui";
   ctx.lineWidth = 1;
   for (let r = 10; r <= MAP_RANGE_M; r += 10) {
@@ -249,6 +249,9 @@ function connect(): void {
         if (trail.length > TRAIL) trail.shift();
         trails.set(t.track_id, trail);
       }
+      // forget trails of tracks that have ended, so a long live run does not grow forever
+      const live = new Set(tracks.map((t) => t.track_id));
+      for (const id of trails.keys()) if (!live.has(id)) trails.delete(id);
       drawMap();
       renderTable();
     } else if (msg.type === "rdmaps") {
@@ -259,12 +262,14 @@ function connect(): void {
 
 // ---------- chat ----------
 const log = $("chat-log");
+const MAX_MESSAGES = 200;
 
 function bubble(kind: string, text: string): HTMLDivElement {
   const div = document.createElement("div");
   div.className = `msg ${kind}`;
   div.textContent = text; // plain text only: answers may echo untrusted data
   log.append(div);
+  while (log.childElementCount > MAX_MESSAGES) log.firstElementChild?.remove();
   log.scrollTop = log.scrollHeight;
   return div;
 }
@@ -285,7 +290,9 @@ async function post(path: string, body: unknown): Promise<Turn> {
   if (!res.ok) {
     let detail = `${res.status}`;
     try {
-      detail = ((await res.json()) as { detail?: string }).detail ?? detail;
+      const d = ((await res.json()) as { detail?: unknown }).detail;
+      if (typeof d === "string") detail = d;
+      else if (d !== undefined) detail = JSON.stringify(d); // validation errors are a list
     } catch {
       /* not JSON */
     }
@@ -330,6 +337,7 @@ function show(turn: Turn): void {
   yes.onclick = () => decide(true);
   no.onclick = () => decide(false);
   box.append(pre, yes, " ", no);
+  yes.focus(); // keyboard users land on the choice
 }
 
 $<HTMLFormElement>("chat-form").addEventListener("submit", (ev) => {

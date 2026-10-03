@@ -34,7 +34,8 @@ fi
 install -m 755 k3s/k3s /usr/local/bin/k3s
 mkdir -p /var/lib/rancher/k3s/agent/images
 cp k3s/k3s-airgap-images-amd64.tar.zst images/upchirp-images.tar.zst /var/lib/rancher/k3s/agent/images/
-INSTALL_K3S_SKIP_DOWNLOAD=true INSTALL_K3S_EXEC="--write-kubeconfig-mode 644" sh k3s/install-k3s.sh
+# the cluster admin file stays readable by root only (k3s default 600): use sudo k3s kubectl
+INSTALL_K3S_SKIP_DOWNLOAD=true sh k3s/install-k3s.sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 install -m 755 bin/helm /usr/local/bin/helm
 
@@ -43,6 +44,8 @@ for i in $(seq 1 120); do
   k3s kubectl get nodes 2>/dev/null | grep -q " Ready" && break
   sleep 5
 done
+k3s kubectl get nodes | grep -q " Ready" || {
+  echo "Kubernetes did not become ready in 10 minutes. See: sudo journalctl -u k3s"; exit 1; }
 k3s kubectl get nodes
 
 step "4/6 Copying the AI models"
@@ -54,7 +57,9 @@ helm upgrade --install upchirp chart/upchirp-*.tgz --namespace upchirp --create-
   --wait --timeout 20m
 
 step "6/6 Done"
-IP=$(hostname -I | awk '{print $1}')
+# the first address that is not the placeholder route's (an offline box may have none)
+IP=$(hostname -I | tr ' ' '\n' | grep -v '^10\.254\.254\.' | grep . | head -n 1 || true)
+IP=${IP:-127.0.0.1}
 cat <<MSG
 Upchirp is running.
   Live view and chat:  http://$IP/        (or http://$IP:30080)

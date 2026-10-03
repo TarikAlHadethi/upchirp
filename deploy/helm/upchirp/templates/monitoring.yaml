@@ -34,6 +34,7 @@ spec:
         - name: prometheus
           image: {{ .Values.images.prometheus }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          resources: {{- toYaml .Values.resources.prometheus | nindent 12 }}
           args: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=15d"]
           ports: [{containerPort: 9090}]
           volumeMounts: [{name: config, mountPath: /etc/prometheus}]
@@ -80,7 +81,11 @@ spec:
         - name: grafana
           image: {{ .Values.images.grafana }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          resources: {{- toYaml .Values.resources.grafana | nindent 12 }}
           env:
+            # view only: no login form, so the default admin password cannot be used
+            - {name: GF_AUTH_DISABLE_LOGIN_FORM, value: "true"}
+            - {name: GF_AUTH_BASIC_ENABLED, value: "false"}
             - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "true"}
             - {name: GF_AUTH_ANONYMOUS_ORG_ROLE, value: Viewer}
             - {name: GF_ANALYTICS_REPORTING_ENABLED, value: "false"}

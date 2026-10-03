@@ -57,6 +57,23 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "main" {
   }
 }
 
+# Refuse any request that is not over TLS
+resource "aws_s3_bucket_policy" "tls_only" {
+  bucket     = aws_s3_bucket.main.id
+  depends_on = [aws_s3_bucket_public_access_block.main]
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "DenyInsecureTransport"
+      Effect    = "Deny"
+      Principal = "*"
+      Action    = "s3:*"
+      Resource  = [aws_s3_bucket.main.arn, "${aws_s3_bucket.main.arn}/*"]
+      Condition = { Bool = { "aws:SecureTransport" = "false" } }
+    }]
+  })
+}
+
 # ---------- budget alarm ----------
 
 resource "aws_budgets_budget" "monthly" {

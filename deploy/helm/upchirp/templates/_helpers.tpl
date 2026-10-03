@@ -31,3 +31,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 - name: UPCHIRP_PUBLIC
   value: {{ if .Values.agent.public }}"1"{{ else }}"0"{{ end }}
 {{- end }}
+
+{{/* The app image runs as user upchirp (uid 1000, Dockerfile); enforce it and drop privileges. */}}
+{{- define "upchirp.appSecurity" -}}
+runAsNonRoot: true
+runAsUser: 1000
+runAsGroup: 1000
+allowPrivilegeEscalation: false
+capabilities: {drop: [ALL]}
+{{- end }}

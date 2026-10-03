@@ -13,6 +13,16 @@ git archive --format=tar.gz -o "${TMPDIR:-/tmp}/upchirp.tar.gz" HEAD
 "${AWS[@]}" s3 cp deploy/demo/server-setup.sh "s3://$BUCKET/releases/server-setup.sh"
 
 if [ "${1:-}" = "--upload-only" ]; then exit 0; fi
-"${AWS[@]}" ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
+CMD=$("${AWS[@]}" ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
   --comment "upchirp deploy" --query Command.CommandId --output text \
-  --parameters "commands=[\"aws s3 cp --region $REGION s3://$BUCKET/releases/server-setup.sh /root/server-setup.sh\",\"bash /root/server-setup.sh $BUCKET $REGION > /var/log/upchirp-deploy.log 2>&1\"]"
+  --parameters "commands=[\"aws s3 cp --region $REGION s3://$BUCKET/releases/server-setup.sh /root/server-setup.sh\",\"bash /root/server-setup.sh $BUCKET $REGION > /var/log/upchirp-deploy.log 2>&1\"]")
+echo "Deploying (command $CMD); image builds take several minutes..."
+while :; do
+  STATUS=$("${AWS[@]}" ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
+    --query Status --output text 2>/dev/null || echo Pending)
+  case "$STATUS" in
+    Success) echo "Deployed."; exit 0 ;;
+    Pending|InProgress|Delayed) sleep 15 ;;
+    *) echo "Deploy failed ($STATUS). On the server: /var/log/upchirp-deploy.log"; exit 1 ;;
+  esac
+done

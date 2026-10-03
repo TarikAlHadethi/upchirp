@@ -5,13 +5,16 @@ set -euo pipefail
 BUCKET="$1"
 REGION="${2:-eu-central-1}"
 APP=/opt/upchirp
+COMPOSE_VERSION=v5.6.0
+COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
 
 if ! command -v docker >/dev/null; then
   dnf install -y docker
   systemctl enable --now docker
   mkdir -p /usr/libexec/docker/cli-plugins
   curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
-    "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64"
+    "https://github.com/docker/compose/releases/download/$COMPOSE_VERSION/docker-compose-linux-aarch64"
+  echo "$COMPOSE_SHA256  /usr/libexec/docker/cli-plugins/docker-compose" | sha256sum -c -
   chmod +x /usr/libexec/docker/cli-plugins/docker-compose
   # 2 GB of RAM: add 2 GB of swap for image builds and the database
   if [ ! -f /swapfile ]; then
@@ -20,9 +23,13 @@ if ! command -v docker >/dev/null; then
   fi
 fi
 
-mkdir -p "$APP"
+# unpack into a fresh folder, then swap it in, so files deleted in the repo are gone here too
 aws s3 cp --region "$REGION" "s3://$BUCKET/releases/upchirp.tar.gz" /tmp/upchirp.tar.gz
-tar -xzf /tmp/upchirp.tar.gz -C "$APP"
+rm -rf "$APP.new" && mkdir -p "$APP.new"
+tar -xzf /tmp/upchirp.tar.gz -C "$APP.new"
+rm -rf "$APP.old"
+if [ -d "$APP" ]; then mv "$APP" "$APP.old"; fi
+mv "$APP.new" "$APP"
 
 ENV_FILE="$APP/deploy/demo/.env"
 if [ ! -f /etc/upchirp-db-password ]; then

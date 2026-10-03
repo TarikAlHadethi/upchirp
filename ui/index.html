@@ -18,7 +18,7 @@
     <main>
       <section class="panel map">
         <h2>Top-down view <span class="muted">radar at the bottom, range rings every 10 m</span></h2>
-        <canvas id="map"></canvas>
+        <canvas id="map" role="img" aria-label="Top-down map of the tracked targets"></canvas>
         <div class="legend">
           <span><i class="dot person"></i>person</span>
           <span><i class="dot car"></i>car</span>
@@ -28,7 +28,7 @@
       </section>
       <section class="panel rd">
         <h2>Range and speed <span class="muted">brighter is a stronger echo</span></h2>
-        <canvas id="rd"></canvas>
+        <canvas id="rd" role="img" aria-label="Range and speed picture of the radar echoes"></canvas>
         <div class="axis-note muted">range (m) across, radial speed (m/s) up = moving away</div>
       </section>
       <section class="panel tracks">
@@ -40,9 +40,9 @@
       </section>
       <section class="panel chat">
         <h2>Ask the agent <span class="muted">answers come from the recorded data</span></h2>
-        <div id="chat-log"></div>
+        <div id="chat-log" role="log" aria-live="polite"></div>
         <form id="chat-form">
-          <input id="chat-input" autocomplete="off"
+          <input id="chat-input" autocomplete="off" aria-label="Question for the agent"
                  placeholder="How many drone-like tracks crossed in the last 10 minutes?" />
           <button type="submit">Ask</button>
         </form>

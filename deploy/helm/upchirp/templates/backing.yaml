@@ -24,6 +24,7 @@ spec:
         - name: redpanda
           image: {{ .Values.images.redpanda }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          resources: {{- toYaml .Values.resources.redpanda | nindent 12 }}
           args:
             - redpanda
             - start
@@ -69,6 +70,7 @@ spec:
         - name: db
           image: {{ .Values.images.db }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          resources: {{- toYaml .Values.resources.db | nindent 12 }}
           env:
             - {name: POSTGRES_USER, value: upchirp}
             - {name: POSTGRES_DB, value: upchirp}
@@ -109,6 +111,7 @@ spec:
         - name: ollama
           image: {{ .Values.images.ollama }}
           imagePullPolicy: {{ .Values.pullPolicy }}
+          resources: {{- toYaml .Values.resources.ollama | nindent 12 }}
           env: [{name: OLLAMA_KEEP_ALIVE, value: "24h"}]
           ports: [{containerPort: 11434}]
           readinessProbe:

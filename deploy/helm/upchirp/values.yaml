@@ -25,6 +25,16 @@ ui:
 grafana:
   nodePort: 30300
 
+# Memory limits keep one service from starving the others on a small box. The 7B model
+# needs about 5 GB, so ollama gets most of it.
+resources:
+  app: {requests: {cpu: 50m, memory: 256Mi}, limits: {memory: 1Gi}}
+  redpanda: {requests: {cpu: 100m, memory: 1Gi}, limits: {memory: 1536Mi}}
+  db: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 2Gi}}
+  ollama: {requests: {cpu: 500m, memory: 5Gi}, limits: {memory: 8Gi}}
+  prometheus: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
+  grafana: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
+
 storage:
   db: 10Gi
   redpanda: 5Gi
