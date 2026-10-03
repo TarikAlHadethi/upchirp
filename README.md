@@ -47,6 +47,7 @@ All numbers come from the eval suite (`make evals`) on simulated scenes with kno
 | False tracks | none in most runs, at most 0.03 per frame |
 | Track ID switches | none between two people passing within 3 m; a drone flying over a car can break its track, and the agent's tools stitch the pieces back |
 | Position error (RMS) | people and cars at most 0.5 m, the drone about 1 m |
+| Cars at their real size (4.5 m) | one track per car, from the echoes along its body; a drone flying low over a real-size car is a known limit |
 | Classifier on real radar data (RAD-DAR, unseen recordings) | 90%, with no measurable cost from converting to our radar's grid |
 | Agent answer to the drone question | correct 10 of 10 on a local 7B model, about 16 s each, no network |
 | Planted wrong tool output | caught by the answer check every time |
