@@ -119,7 +119,7 @@ def create_app(data_dir: Path, live: bool = True, public: bool | None = None) ->
         if "agent" not in agent_box:
             from upchirp.agent.graph import Agent
 
-            agent_box["agent"] = Agent(data_dir)
+            agent_box["agent"] = Agent(data_dir, public=public)
         return agent_box["agent"]
 
     def guarded(fn: Any, *args: Any) -> Any:
@@ -181,11 +181,16 @@ def create_app(data_dir: Path, live: bool = True, public: bool | None = None) ->
             guard.check(visitor)
         except Limited as e:
             raise HTTPException(e.status, e.message) from None
-        turn = await agent().start(q.question)
         from upchirp.agent.graph import model_id
 
-        inp, out = tokens(turn.get("messages", []))
-        guard.record(inp, out, cost_usd(model_id(), inp, out))
+        inp = out = 0
+        cost = guard.reserve_usd  # if the answer fails part way, its tokens were still spent
+        try:
+            turn = await agent().start(q.question)
+            inp, out = tokens(turn.get("messages", []))
+            cost = cost_usd(model_id(), inp, out)
+        finally:
+            guard.record(inp, out, cost)
         return _turn(turn)
 
     @app.post("/api/ask/{thread_id}/decision")

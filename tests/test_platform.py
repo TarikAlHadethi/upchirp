@@ -98,7 +98,7 @@ def test_api_errors_are_clean(client: TestClient) -> None:
 def test_public_guard_limits() -> None:
     from upchirp.api.guard import Limited, PublicGuard
 
-    g = PublicGuard(per_minute=2, per_day=3, daily_cap_usd=0.01)
+    g = PublicGuard(per_minute=2, per_day=3, daily_cap_usd=0.01, reserve_usd=0.0)
     g.check("a")
     g.check("a")
     with pytest.raises(Limited) as e:
@@ -109,6 +109,27 @@ def test_public_guard_limits() -> None:
     with pytest.raises(Limited) as e:
         g.check("c")
     assert e.value.status == 503
+
+
+def test_questions_in_flight_hold_budget() -> None:
+    from upchirp.api.guard import Limited, PublicGuard
+
+    g = PublicGuard(per_minute=100, per_day=100, daily_cap_usd=0.25, reserve_usd=0.10)
+    g.check("a")
+    g.check("b")  # two answers running: 0.20 of 0.25 held
+    with pytest.raises(Limited) as e:
+        g.check("c")
+    assert e.value.status == 503
+    g.record(100, 10, 0.001)  # one finished cheaply: its hold is released
+    g.check("c")
+
+
+def test_unknown_paid_model_is_never_free() -> None:
+    from upchirp.agent.costs import cost_usd
+
+    assert cost_usd("eu.anthropic.claude-opus-5-5-v1:0", 100_000, 10_000) == pytest.approx(0.6)
+    assert cost_usd("eu.anthropic.claude-new-model-9", 100_000, 10_000) >= 0.6
+    assert cost_usd("qwen2.5:7b-instruct", 100_000, 10_000) == 0.0
 
 
 def test_public_api_refuses_approvals(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

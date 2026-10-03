@@ -38,7 +38,7 @@ def _today() -> str:
 
 class PublicGuard:
     def __init__(self, per_minute: int | None = None, per_day: int | None = None,
-                 daily_cap_usd: float | None = None) -> None:
+                 daily_cap_usd: float | None = None, reserve_usd: float | None = None) -> None:
         env = os.environ.get
         self.per_minute = per_minute or int(env("UPCHIRP_RATE_PER_MINUTE", "5"))
         self.per_day = per_day or int(env("UPCHIRP_RATE_PER_DAY", "40"))
@@ -47,6 +47,11 @@ class PublicGuard:
         self.lock = threading.Lock()
         self.hits: dict[str, deque[float]] = defaultdict(deque)
         self.memory: dict[str, float] = defaultdict(float)
+        # Each question in flight holds this much of today's budget until its real cost is
+        # known, so many questions at once cannot all slip under the cap.
+        self.reserve_usd = reserve_usd if reserve_usd is not None else float(
+            env("UPCHIRP_RESERVE_PER_ANSWER_USD", "0.10"))
+        self.reserved = 0.0
         self.use_db = bool(store.database_url())
         if self.use_db:
             with store.connect() as conn:
@@ -71,11 +76,16 @@ class PublicGuard:
                 raise Limited(429, "Too many questions; wait a minute.")
             if len(hits) >= self.per_day:
                 raise Limited(429, "Daily question limit reached for your address.")
-            if self.spent_today() >= self.cap:
+            if self.spent_today() + self.reserved + self.reserve_usd > self.cap:
                 raise Limited(503, "The demo's daily budget is used up. Try again tomorrow.")
             hits.append(now)
+            self.reserved += self.reserve_usd
 
     def record(self, input_tokens: int, output_tokens: int, cost: float) -> None:
+        """Book one answer's real cost and release its reservation. Call exactly once per
+        successful check(), also when the answer failed (then with the reservation)."""
+        with self.lock:
+            self.reserved = max(0.0, self.reserved - self.reserve_usd)
         if not self.use_db:
             self.memory[_today()] += cost
             return
