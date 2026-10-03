@@ -33,10 +33,8 @@ from langgraph.types import Command, interrupt
 
 from upchirp.agent.server import AUDIT_FILE
 
-ALLOWED_TOOLS = {
-    "list_sessions", "get_tracks", "summarize_session", "search_docs",
-    "replay_recording", "set_chirp_config",
-}
+READ_TOOLS = {"list_sessions", "get_tracks", "summarize_session", "search_docs"}
+ALLOWED_TOOLS = READ_TOOLS | {"replay_recording", "set_chirp_config"}
 DEFAULT_OLLAMA_MODEL = "qwen2.5:7b-instruct"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-5-5"
 DEFAULT_BEDROCK_MODEL = "eu.anthropic.claude-opus-5-5"
@@ -137,8 +135,10 @@ def make_model() -> BaseChatModel:
     )
 
 
-def mcp_client(data_dir: Path) -> MultiServerMCPClient:
+def mcp_client(data_dir: Path, public: bool = False) -> MultiServerMCPClient:
     env = {**os.environ, "UPCHIRP_DATA_DIR": str(data_dir.resolve())}
+    if public:
+        env["UPCHIRP_PUBLIC"] = "1"  # the server then registers read tools only
     return MultiServerMCPClient({
         "upchirp": {
             "transport": "stdio",
@@ -165,10 +165,11 @@ def build_graph(
     tools: list[BaseTool],
     data_dir: Path,
     tool_filter: ToolFilter | None = None,
+    public: bool = False,
 ) -> Any:
     """Compile the agent graph. `tool_filter` rewrites tool output (used by evals
-    to plant wrong data)."""
-    tools = [t for t in tools if t.name in ALLOWED_TOOLS]
+    to plant wrong data). `public` keeps read tools only, whatever the server offers."""
+    tools = [t for t in tools if t.name in (READ_TOOLS if public else ALLOWED_TOOLS)]
     destructive = {t.name for t in tools if is_destructive(t)}
     bound = model.bind_tools(tools)
     tool_node = ToolNode(tools)
@@ -252,17 +253,18 @@ class Agent:
     approval can arrive in a later request (the web chat)."""
 
     def __init__(self, data_dir: Path, model: BaseChatModel | None = None,
-                 tool_filter: ToolFilter | None = None) -> None:
+                 tool_filter: ToolFilter | None = None, public: bool = False) -> None:
         self.data_dir = data_dir
+        self.public = public
         self.model = model
         self.tool_filter = tool_filter
         self.graph: Any = None
 
     async def _ensure(self) -> Any:
         if self.graph is None:
-            tools = await mcp_client(self.data_dir).get_tools()
+            tools = await mcp_client(self.data_dir, self.public).get_tools()
             self.graph = build_graph(self.model or make_model(), tools, self.data_dir,
-                                     self.tool_filter)
+                                     self.tool_filter, self.public)
         return self.graph
 
     async def _run(self, payload: Any, thread_id: str) -> dict[str, Any]:

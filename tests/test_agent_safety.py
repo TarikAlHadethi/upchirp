@@ -121,3 +121,29 @@ def test_grounding_guard() -> None:
     assert not needs_grounding([q, tool, AIMessage("1 drone-like track.")])
     assert not needs_grounding([q, copied, HumanMessage(GROUNDING_NUDGE), copied])  # once only
     assert not needs_grounding([HumanMessage("hi"), AIMessage("Hello!")])
+
+
+def test_public_agent_never_sees_control_tools(tmp_path: Path,
+                                               monkeypatch: pytest.MonkeyPatch) -> None:
+    """Even with UPCHIRP_PUBLIC unset, a public agent gets read tools only."""
+    monkeypatch.delenv("UPCHIRP_PUBLIC", raising=False)
+
+    async def run() -> tuple[set[str], list[BaseMessage]]:
+        tools = await mcp_client(tmp_path, public=True).get_tools()
+        graph = build_graph(_script(CHIRP_CALL), tools, tmp_path, public=True)
+        state = await graph.ainvoke({"messages": []}, {"configurable": {"thread_id": "t"}})
+        return {t.name for t in tools}, list(state["messages"])
+
+    names, messages = asyncio.run(run())
+    assert names == {"list_sessions", "get_tracks", "summarize_session", "search_docs"}
+    assert not (tmp_path / server.PENDING_CHIRP_FILE).exists()
+    assert any("not a valid tool" in str(m.content) for m in messages)
+
+
+@pytest.mark.parametrize("session", ["../sessions", "..", "a/b", "/etc"])
+def test_session_ids_are_plain_names(tmp_path: Path, session: str) -> None:
+    from upchirp.recording import resolve_session
+
+    with pytest.raises(FileNotFoundError) as e:
+        resolve_session(tmp_path, session)
+    assert str(tmp_path) not in str(e.value)

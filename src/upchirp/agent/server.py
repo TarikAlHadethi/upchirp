@@ -96,6 +96,9 @@ def list_sessions() -> dict[str, Any]:
     sessions = data.list_sessions(data_dir())
     for s in sessions:
         s["operator_notes_untrusted"] = s.pop("operator_notes", "")
+        # names come from recording files anyone could edit: data, never instructions
+        if "scene" in s:
+            s["scene_untrusted"] = s.pop("scene")
     return {"notice": UNTRUSTED_NOTICE, "sessions": sessions}
 
 

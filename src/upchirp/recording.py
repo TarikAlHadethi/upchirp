@@ -168,11 +168,14 @@ def resolve_session(data_dir: Path, session: str) -> Path:
     """Find a session directory by id, or the newest one for 'latest'."""
     root = sessions_dir(data_dir)
     if session != "latest":
+        # a plain folder name only: no paths, and no server paths in the error
+        if Path(session).name != session or session in ("", ".", ".."):
+            raise FileNotFoundError(f"no session '{session}'")
         path = root / session
         if not (path / MANIFEST_FILE).exists():
-            raise FileNotFoundError(f"no session '{session}' in {root}")
+            raise FileNotFoundError(f"no session '{session}'")
         return path
     candidates = [p.parent for p in root.glob(f"*/{MANIFEST_FILE}")]
     if not candidates:
-        raise FileNotFoundError(f"no sessions in {root}; run 'upchirp sim' first")
+        raise FileNotFoundError("no sessions yet; run 'upchirp sim' first")
     return max(candidates, key=lambda p: read_manifest(p)["created_ns"])
