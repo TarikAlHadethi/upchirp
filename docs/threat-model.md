@@ -25,7 +25,7 @@ Out of scope for now: someone with shell access to the edge box, and radio attac
 | Threat | Controls | Tested by |
 | --- | --- | --- |
 | Planted text makes the agent change radar settings | 1. Settings changes need a human yes (LangGraph interrupt). 2. The change is blocked outright unless the user's own question asked for one. 3. The tool does not exist in public mode. 4. Limits keep any config inside 5.725 to 5.875 GHz | `tests/test_agent_safety.py` (approve, deny, blocked, public mode, out of band); `evals/test_injection.py` |
-| Planted text makes the agent report false numbers | 1. Notes and doc passages come back marked untrusted, with a notice. 2. System prompt: track numbers only from track tools. 3. Grounding guard in code: an answer about tracks without a track tool call is sent back once | `evals/test_injection.py` (notes and docs); `tests/test_agent_safety.py::test_grounding_guard` |
+| Planted text makes the agent report false numbers | 1. Notes, scene names and doc passages come back marked untrusted, with a notice. 2. System prompt: track numbers only from track tools. 3. Grounding guard in code: an answer about tracks without a track tool call is sent back once | `evals/test_injection.py` (notes and docs); `tests/test_agent_safety.py::test_grounding_guard` |
 | Agent calls a tool it should not have | Allowlist applied when the agent starts, whatever the MCP server offers | `tests/test_agent_safety.py::test_tools_off_the_allowlist_never_run` |
 | Wrong data from a tool goes unnoticed | Answers checked against ground truth and against SQL; planted wrong tool output must fail the check | `evals/test_agent.py`, `evals/test_agent_sql.py` |
 | Pipeline regression gives wrong tracks | Detection, tracking and label gates on two scenes; planted angle fault must fail | `evals/test_detection_tracking.py` |
@@ -33,7 +33,9 @@ Out of scope for now: someone with shell access to the edge box, and radio attac
 | No record of what the agent did | Every question, tool call, approval, block and answer goes to the audit log | `evals/test_agent.py::test_audit_log_records_question_tools_and_answer` |
 | Secrets leak from the repo | `.env` git-ignored; AWS by role (step 6); no keys on the demo server | `.gitignore`; review at step 6 |
 | Services reachable from the network | Compose binds every port to 127.0.0.1; dev database password is for local use only | `compose.yaml` |
-| Public demo abuse and cost (step 6) | Read-only tools, rate limit, daily spend cap, budget alarm | To build in step 6 |
+| Public demo abuse and cost (step 6) | 1. Read-only tools: the server registers only read tools in public mode, and the agent keeps only read tools whatever the server offers. 2. Rate limit per address. 3. Daily spend cap: each question holds an estimate of its cost until its real cost is known, so a burst cannot slip past; a failed answer is still charged; an unknown paid model is charged at the highest known price. 4. AWS budget alarm | `tests/test_platform.py` (limits, budget held by questions in flight, unknown model never free); `tests/test_agent_safety.py::test_public_agent_never_sees_control_tools` |
+| Secrets leak into logs | Alert errors are logged as an HTTP status, never the URL (Telegram's holds the bot token); httpx request logging is turned down | `tests/test_alerts.py::test_bot_token_never_reaches_the_log` |
+| Paths or server details leak through errors | Session ids must be plain names; errors never include server paths | `tests/test_agent_safety.py::test_session_ids_are_plain_names` |
 
 ## Known gaps
 
