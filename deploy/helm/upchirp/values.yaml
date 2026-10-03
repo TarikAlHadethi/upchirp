@@ -25,13 +25,14 @@ ui:
 grafana:
   nodePort: 30300
 
-# Memory limits keep one service from starving the others on a small box. The 7B model
-# needs about 5 GB, so ollama gets most of it.
+# Memory: requests are what each service is guaranteed (they must all fit an 8 GB box,
+# about 3.7 GB in total); limits stop one service from starving the others. The 7B model
+# uses about 5 GB while answering, so ollama gets the highest limit.
 resources:
-  app: {requests: {cpu: 50m, memory: 256Mi}, limits: {memory: 1Gi}}
-  redpanda: {requests: {cpu: 100m, memory: 1Gi}, limits: {memory: 1536Mi}}
+  app: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 1Gi}}
+  redpanda: {requests: {cpu: 100m, memory: 512Mi}, limits: {memory: 1536Mi}}
   db: {requests: {cpu: 100m, memory: 256Mi}, limits: {memory: 2Gi}}
-  ollama: {requests: {cpu: 500m, memory: 5Gi}, limits: {memory: 8Gi}}
+  ollama: {requests: {cpu: 500m, memory: 2Gi}, limits: {memory: 8Gi}}
   prometheus: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
   grafana: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
 
