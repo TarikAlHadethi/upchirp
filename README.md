@@ -1,5 +1,7 @@
 # Upchirp
 
+[![ci](https://github.com/TarikAlHadethi/upchirp/actions/workflows/ci.yml/badge.svg)](https://github.com/TarikAlHadethi/upchirp/actions/workflows/ci.yml)
+
 An offline sensor data platform with an AI agent. A custom 5.8 GHz FMCW radar is the sensor: it detects, tracks and classifies people, cars and drone-like targets, and an agent answers questions about what it saw, with the network cable unplugged.
 
 ![Live view: tracks on a top-down map, the range and speed picture, and the agent answering a question](docs/media/live-view.gif)
