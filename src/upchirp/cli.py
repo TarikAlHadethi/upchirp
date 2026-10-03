@@ -280,7 +280,11 @@ def api(
     from upchirp.api.app import create_app
 
     os.environ.setdefault("UPCHIRP_DATABASE_URL", DEV_DATABASE_URL)
-    uvicorn.run(create_app(data_dir), host=host, port=port, log_level="warning")
+    # No per-message compression: the large message (the range-Doppler image) is already
+    # compressed once by the processor; compressing it again for each viewer cost the API
+    # most of its CPU (50 viewers: 0.5 s per REST call with it, 0.05 s without)
+    uvicorn.run(create_app(data_dir), host=host, port=port, log_level="warning",
+                ws_per_message_deflate=False)
 
 
 @app.command()

@@ -2,6 +2,7 @@
 
 import base64
 import json
+import zlib
 from pathlib import Path
 from typing import Any
 
@@ -42,7 +43,9 @@ def test_rdmap_message_is_8_bit_and_sized() -> None:
     power = np.full((64, 256), 1.0)
     power[32, 20] = 1e6  # +60 dB over the floor
     msg = services.rdmap_message(power, ChirpConfig())
-    img = np.frombuffer(base64.b64decode(msg["data"]), dtype=np.uint8).reshape(msg["shape"])
+    raw = zlib.decompress(base64.b64decode(msg["data"]))
+    img = np.frombuffer(raw, dtype=np.uint8).reshape(msg["shape"])
+    assert msg["encoding"] == "zlib"
     assert img[32, 20] == 255 and img[0, 0] == 0
     assert len(msg["data"]) < 30_000
 

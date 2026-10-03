@@ -14,6 +14,7 @@ import json
 import logging
 import time
 import uuid
+import zlib
 from collections.abc import Iterable
 from typing import Any
 
@@ -67,7 +68,10 @@ def run_source(frames: Iterable[Frame], label: str = "source") -> int:
 
 
 def rdmap_message(power: npt.NDArray[Any], chirp: ChirpConfig) -> dict[str, Any]:
-    """An 8-bit image of the range-Doppler map: 0 at the median noise, 255 at +60 dB."""
+    """An 8-bit image of the range-Doppler map: 0 at the median noise, 255 at +60 dB.
+
+    Compressed once here (zlib, about half the size), not once per viewer: the API
+    sends it to every browser as is, and the browser decompresses it."""
     db = 10 * np.log10(power + 1e-30)
     img = np.clip((db - np.median(db)) * (255 / RDMAP_DYNAMIC_RANGE_DB), 0, 255).astype(np.uint8)
     return {
@@ -75,7 +79,8 @@ def rdmap_message(power: npt.NDArray[Any], chirp: ChirpConfig) -> dict[str, Any]
         "range_bin_m": chirp.range_bin_m,
         "velocity_bin_mps": chirp.velocity_bin_mps,
         "dynamic_range_db": RDMAP_DYNAMIC_RANGE_DB,
-        "data": base64.b64encode(img.tobytes()).decode(),
+        "encoding": "zlib",
+        "data": base64.b64encode(zlib.compress(img.tobytes(), 6)).decode(),
     }
 
 

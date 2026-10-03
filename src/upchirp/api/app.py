@@ -33,7 +33,9 @@ from upchirp.api.guard import Limited, PublicGuard
 
 UI_DIST = Path(os.environ.get("UPCHIRP_UI_DIST",
                               Path(__file__).resolve().parents[3] / "ui" / "dist"))
-LIVE_TOPICS = [stream.TRACKS, stream.DETECTIONS, stream.RDMAPS]
+# What the live view draws. Detections are left out: the page does not show them, and they
+# were a third of the messages sent to every browser.
+LIVE_TOPICS = [stream.TRACKS, stream.RDMAPS]
 
 
 class Broadcaster:

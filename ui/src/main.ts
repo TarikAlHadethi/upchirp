@@ -23,12 +23,12 @@ interface Head {
 
 type LiveMessage =
   | (Head & { type: "tracks"; tracks: Track[] })
-  | (Head & { type: "detections"; detections: unknown[] })
   | (Head & {
       type: "rdmaps";
       shape: [number, number];
       range_bin_m: number;
       velocity_bin_mps: number;
+      encoding?: "zlib";
       data: string;
     });
 
@@ -161,10 +161,42 @@ function buildLut(): Uint8ClampedArray {
   return lut;
 }
 
-function drawRd(msg: Extract<LiveMessage, { type: "rdmaps" }>): void {
+type RdMessage = Extract<LiveMessage, { type: "rdmaps" }>;
+
+async function rdBytes(msg: RdMessage): Promise<Uint8Array> {
+  const raw = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
+  if (msg.encoding !== "zlib") return raw;
+  // zlib is what the browser calls "deflate"
+  const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate"));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+// Only the newest picture matters: while one is being unpacked, newer ones replace the
+// waiting one instead of queueing up.
+let rdBusy = false;
+let rdNext: RdMessage | null = null;
+
+async function showRd(msg: RdMessage): Promise<void> {
+  if (rdBusy) {
+    rdNext = msg;
+    return;
+  }
+  rdBusy = true;
+  try {
+    drawRd(msg, await rdBytes(msg));
+  } catch {
+    /* a damaged picture is skipped; the next one comes in 0.1 s */
+  } finally {
+    rdBusy = false;
+    const next = rdNext;
+    rdNext = null;
+    if (next) void showRd(next);
+  }
+}
+
+function drawRd(msg: RdMessage, bytes: Uint8Array): void {
   const [nDop, nRng] = msg.shape;
   const cols = Math.min(nRng, RD_MAX_RANGE_BINS);
-  const bytes = Uint8Array.from(atob(msg.data), (c) => c.charCodeAt(0));
   const img = new ImageData(cols, nDop);
   for (let d = 0; d < nDop; d++) {
     const row = nDop - 1 - d; // positive speed at the top
@@ -255,7 +287,7 @@ function connect(): void {
       drawMap();
       renderTable();
     } else if (msg.type === "rdmaps") {
-      drawRd(msg);
+      void showRd(msg);
     }
   };
 }
