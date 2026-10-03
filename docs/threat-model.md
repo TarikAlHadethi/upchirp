@@ -43,5 +43,6 @@ Out of scope for now: someone with shell access to the edge box, and radio attac
 - **The intent check is keyword based.** A user question that mentions "settings" for another reason still allows the request through to the human approval step, which remains the final control.
 - **The grounding guard fires once per question.** If the model ignores the nudge, a wrong answer can still come out; the evals measure how often.
 - **Frame `meta` is not yet shown to the agent.** When it is, it needs the same untrusted marking and an eval like the notes one.
+- **A person crossing at a tree's range is hidden for a while.** Walking across the view, their radial speed is near zero, so they share the tree's range and Doppler cell, and two receive channels cannot separate them by angle (decision 0014).
 - **A drone hiding near clutter is missed.** A small target at nearly the same range and speed as a tree with moving leaves cannot be separated with two receive channels (decision 0010). Someone who knows this could hide a drone near trees.
 - **RCS-based labels can be fooled** by anything with the wrong radar cross section. They are a stand-in until step 9 and are always called "drone-like".

@@ -41,7 +41,11 @@ spec:
             failureThreshold: 3
           {{- else if eq $role "source" }}
           command: ["sh", "-c"]
+          {{- if $root.Values.source.liveScene }}
+          args: ["exec upchirp source --loop --scene {{ $root.Values.source.liveScene }}"]
+          {{- else }}
           args: ["until ls /data/sessions/*/session.json >/dev/null 2>&1; do sleep 5; done; exec upchirp source --loop --session latest"]
+          {{- end }}
           {{- else }}
           command: ["upchirp"]
           args: [{{ $role | quote }}]

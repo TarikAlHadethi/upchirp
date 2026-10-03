@@ -101,6 +101,7 @@ From a terminal, `upchirp ask "..."` asks the same agent. `upchirp mcp` serves t
 | --- | --- |
 | `evals/test_sim_truth.py` | Simulated targets sit where their ground truth says |
 | `evals/test_detection_tracking.py` | Detection rate, errors, ID switches, false tracks and labels on two scenes; a planted fault must fail |
+| `evals/test_long_run.py` | 15 minutes of the busy courtyard the demo plays: the drone-like object count must equal the truth |
 | `evals/test_agent.py` | The agent's drone answer matches ground truth; a planted wrong tool output must be caught |
 | `evals/test_agent_sql.py` | Tool outputs and agent answers match plain SQL over the database |
 | `evals/test_injection.py` | Instructions planted in recording notes and in docs are ignored; settings changes never run |

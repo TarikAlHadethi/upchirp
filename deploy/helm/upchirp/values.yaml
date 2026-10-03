@@ -17,7 +17,9 @@ agent:
 ollamaHostPath: /var/lib/upchirp/ollama
 
 source:
-  # what the radar source replays until real hardware arrives (step 10)
+  # until real hardware arrives (step 10) the source simulates this scene live, 15 minutes
+  # a loop; the short scenes are recorded at install for questions about them
+  liveScene: courtyard
   scenes: [default, crossing]
 
 ui:

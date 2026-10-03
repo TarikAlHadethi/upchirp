@@ -91,6 +91,11 @@ def _track_label(states: list[TrackState]) -> str:
 STITCH_GAP_S = 3.0
 STITCH_OVERLAP_S = 0.5  # a new piece often starts just before the old one is dropped
 STITCH_DISTANCE_M = 6.0
+# An object that stood still (a hovering drone flickering behind leaves) and reappears
+# where it stopped is the same object over a longer gap.
+STITCH_STILL_GAP_S = 10.0
+STITCH_STILL_DISTANCE_M = 3.0
+STITCH_STILL_SPEED_MPS = 1.0
 
 
 def stitch(by_track: dict[int, list[TrackState]]) -> dict[int, list[int]]:
@@ -99,25 +104,44 @@ def stitch(by_track: dict[int, list[TrackState]]) -> dict[int, list[int]]:
     heading (within STITCH_DISTANCE_M of its position carried forward at its last
     velocity). The tracker can break a track
     when two objects share a range and angle, such as a drone flying over a car
-    (decision 0012). Returns {object id (its first track id): [track ids]}."""
+    (decision 0012). A piece may also start near where the other one stopped: a short
+    piece of a hovering drone has a poor velocity estimate, so where it was "heading" can
+    be metres off. An object that stood still (moved under STITCH_STILL_SPEED_MPS over its
+    whole span) is joined by a piece starting within STITCH_STILL_DISTANCE_M of where it
+    stopped up to STITCH_STILL_GAP_S later. Returns {object id (its first track id):
+    [track ids]}."""
     pieces = sorted(by_track.items(), key=lambda kv: kv[1][0].timestamp_ns)
     labels = {tid: _track_label(hist) for tid, hist in pieces}
     objects: dict[int, list[int]] = {}
+    head: dict[int, TrackState] = {}  # object id -> its oldest state
     tail: dict[int, TrackState] = {}  # object id -> its newest state
+
+    def still(oid: int) -> bool:
+        span = (tail[oid].timestamp_ns - head[oid].timestamp_ns) / 1e9
+        moved = float(np.hypot(tail[oid].x_m - head[oid].x_m, tail[oid].y_m - head[oid].y_m))
+        return span >= 0.4 and moved / span < STITCH_STILL_SPEED_MPS
+
     for tid, hist in pieces:
         first = hist[0]
-        best, best_d = None, STITCH_DISTANCE_M
+        best, best_d = None, float("inf")
         for oid, last in tail.items():
-            gap = (first.timestamp_ns - last.timestamp_ns) / 1e9
-            in_time = -STITCH_OVERLAP_S <= gap <= STITCH_GAP_S
-            if not in_time or labels[objects[oid][0]] != labels[tid]:
+            if labels[objects[oid][0]] != labels[tid]:
                 continue
-            px, py = last.x_m + last.vx_mps * gap, last.y_m + last.vy_mps * gap
-            d = float(np.hypot(first.x_m - px, first.y_m - py))
-            if d <= best_d:
+            gap = (first.timestamp_ns - last.timestamp_ns) / 1e9
+            from_end = float(np.hypot(first.x_m - last.x_m, first.y_m - last.y_m))
+            if -STITCH_OVERLAP_S <= gap <= STITCH_GAP_S:
+                px, py = last.x_m + last.vx_mps * gap, last.y_m + last.vy_mps * gap
+                d = min(float(np.hypot(first.x_m - px, first.y_m - py)), from_end)
+                ok = d <= STITCH_DISTANCE_M
+            else:
+                d = from_end
+                ok = (0 < gap <= STITCH_STILL_GAP_S and d <= STITCH_STILL_DISTANCE_M
+                      and still(oid))
+            if ok and d < best_d:
                 best, best_d = oid, d
         oid = best if best is not None else tid
         objects.setdefault(oid, []).append(tid)
+        head.setdefault(oid, first)
         if hist[-1].timestamp_ns >= tail.get(oid, hist[-1]).timestamp_ns:
             tail[oid] = hist[-1]
     return objects

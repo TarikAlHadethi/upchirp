@@ -91,3 +91,32 @@ def test_stitch_joins_broken_pieces_only() -> None:
     objects = data.stitch(tracks)
     assert objects[4] == [4, 7]
     assert objects[8] == [8] and objects[9] == [9]
+
+
+def test_stitch_joins_pieces_of_a_hovering_target() -> None:
+    """Short pieces of a hovering drone carry wild velocity estimates; they still join."""
+    from upchirp.dsp.tracker import TrackState
+
+    def piece(tid: int, t0: float, vx: float) -> list[TrackState]:
+        return [TrackState("s", k, int((t0 + k * 0.1) * 1e9), tid, True, 5.0, 58.0, vx, 0.0,
+                           58.2, 4.9, 0.0, abs(vx), 5, 0, "drone_like", -29.0)
+                for k in range(5)]
+
+    tracks = {1: piece(1, 0.0, 6.0), 2: piece(2, 1.0, -5.0), 3: piece(3, 2.0, 4.0)}
+    assert data.stitch(tracks) == {1: [1, 2, 3]}
+
+
+def test_stitch_still_object_over_a_longer_gap_only() -> None:
+    """A hovering drone lost for 7 s is one object; a walker passing the same spot is not."""
+    from upchirp.dsp.tracker import TrackState
+
+    def piece(tid: int, t0: float, t1: float, x0: float, vx: float,
+              label: str = "drone_like") -> list[TrackState]:
+        return [TrackState("s", k, int((t0 + k * 0.1) * 1e9), tid, True,
+                           x0 + vx * k * 0.1, 50.0, vx, 0.0, 50.0, 0.0, 0.0, abs(vx), 5, 0,
+                           label, -25.0) for k in range(int((t1 - t0) * 10) + 1)]
+
+    hover = {1: piece(1, 0, 4, 5.0, 0.0), 2: piece(2, 11, 15, 6.0, 0.0)}
+    assert data.stitch(hover) == {1: [1, 2]}
+    walkers = {1: piece(1, 0, 4, 0.0, 1.4, "person"), 2: piece(2, 11, 15, 6.5, 1.4, "person")}
+    assert data.stitch(walkers) == {1: [1], 2: [2]}

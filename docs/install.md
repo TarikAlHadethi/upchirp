@@ -32,7 +32,7 @@ Open them in a browser on the same computer or on any computer on the same netwo
 
 ## For operators (no engineering background needed)
 
-**Is it working?** Open the live view. The badge at the top right should say **live** in green, and dots should move on the map. Until real radar hardware is connected, the system plays back simulated recordings in a loop: two people, a car and a drone-like target.
+**Is it working?** Open the live view. The badge at the top right should say **live** in green, and dots should move on the map. Until real radar hardware is connected, the system shows a simulated courtyard that repeats every 15 minutes: people walking through, cars on the road behind, and four drone-like targets.
 
 **Asking questions.** Type into the chat box, for example "How many drone-like tracks crossed in the last 10 minutes, and which came closest?" Answers come only from what the radar recorded and take about 15 to 30 seconds. The system never changes radar settings unless you ask it to, and even then it asks you to approve first.
 

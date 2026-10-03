@@ -176,7 +176,89 @@ def tree_hide_scene() -> Scene:
     )
 
 
-SCENES = {"default": default_scene, "crossing": crossing_scene, "tree-hide": tree_hide_scene}
+def courtyard_scene(minutes: float = 15.0, seed: int = 7) -> Scene:
+    """A long, busy courtyard for the live demo and long-run evals: people walking through
+    about every 45 s, cars on the road behind about every 75 s, and four drone-like
+    targets (two crossing, two hovering for a while). The schedule comes from `seed`, so
+    the scene and its ground truth are the same every time.
+
+    Long enough that "the last 10 minutes" means something; it is simulated live, frame
+    by frame, so nothing has to be stored. Hovering drones are kept 10 m or more from trees
+    and walls: a drone hovering beside clutter is a known limit with its own scene, and
+    people do not walk through tree trunks.
+    """
+    # one random stream per kind of target, so changing one never reshuffles the others
+    rng = np.random.default_rng([seed, 1])
+    t0, end = QUIET_START_S, minutes * 60.0
+    targets: list[Target] = []
+
+    t, n = t0 + 3.0, 0
+    while t < end - 30:
+        n += 1
+        speed = float(rng.uniform(1.1, 1.6))
+        trees = [c.position_m for c in COURTYARD_CLUTTER if c.spread_mps > 0]
+        if rng.random() < 0.7:  # across the view, not through a tree trunk
+            y = float(rng.uniform(14, 40))
+            while any(abs(y - ty) < 2.0 for _, ty, _ in trees):
+                y = float(rng.uniform(14, 40))
+            side = min(18.0, 0.9 * y)
+            sign = 1.0 if rng.random() < 0.5 else -1.0
+            start, vel, dur = (-sign * side, y, 0.0), (sign * speed, 0.0, 0.0), 2 * side / speed
+        else:  # towards the radar or away from it
+            x = float(rng.uniform(-8, 8))
+            while any(abs(x - tx) < 2.0 and 12 <= ty <= 42 for tx, ty, _ in trees):
+                x = float(rng.uniform(-8, 8))
+            toward = rng.random() < 0.5
+            start = (x, 42.0 if toward else 12.0, 0.0)
+            vel, dur = (0.0, -speed if toward else speed, 0.0), 30 / speed
+        targets.append(Target(id=f"person-{n}", label="person", position_m=start,
+                              velocity_mps=vel, rcs_m2=1.0, swerling=1, start_s=t,
+                              end_s=min(t + dur, end), micro_doppler=True))
+        t += float(rng.uniform(30, 60))
+
+    car_rng = np.random.default_rng([seed, 2])
+    t, n = t0 + 20.0, 0
+    while t < end - 20:
+        n += 1
+        speed = float(car_rng.uniform(6, 10))
+        sign = 1.0 if car_rng.random() < 0.5 else -1.0
+        targets.append(Target(id=f"car-{n}", label="car",
+                              position_m=(-sign * 45.0, float(car_rng.uniform(52, 62)), 0.0),
+                              velocity_mps=(sign * speed, 0.0, 0.0), rcs_m2=10.0, swerling=3,
+                              start_s=t, end_s=min(t + 90 / speed, end), micro_doppler=True,
+                              extended=True))
+        t += float(car_rng.uniform(50, 100))
+
+    drone_rng = np.random.default_rng([seed, 3])
+    for n, minute in enumerate((1.5, 5.0, 9.0, 12.5), start=1):
+        t = minute * 60
+        if t >= end - 30:
+            break
+        alt = float(drone_rng.uniform(12, 25))
+        if n % 2:  # crossing high over the courtyard
+            sign = 1.0 if drone_rng.random() < 0.5 else -1.0
+            targets.append(Target(
+                id=f"drone-{n}", label="drone_like", position_m=(-sign * 35.0, 75.0, alt),
+                velocity_mps=(sign * 2.5, -2.0, 0.0), rcs_m2=0.01, swerling=1, start_s=t,
+                end_s=t + 24.0, micro_doppler=True))
+        else:  # hovering for a minute, bobbing; not beside a tree or wall (that limit is
+            # the tree-hide scene's, decision 0010: here it would hide the drone for the minute)
+            while True:
+                x, y = float(drone_rng.uniform(-15, 15)), float(drone_rng.uniform(35, 60))
+                if all(np.hypot(x - c.position_m[0], y - c.position_m[1]) > 10
+                       for c in COURTYARD_CLUTTER):
+                    break
+            targets.append(Target(
+                id=f"drone-{n}", label="drone_like", position_m=(x, y, alt),
+                rcs_m2=0.01, swerling=1, start_s=t, end_s=t + 60.0, micro_doppler=True,
+                wobble_m=(0.4, 0.3, 0.2), wobble_period_s=3.0))
+
+    return Scene(name="courtyard", duration_s=end, frame_period_s=0.1,
+                 clutter=COURTYARD_CLUTTER, targets=tuple(targets))
+
+
+SCENES = {"default": default_scene, "crossing": crossing_scene, "tree-hide": tree_hide_scene,
+          "courtyard": courtyard_scene}
 
 
 def get_scene(name: str) -> Scene:
