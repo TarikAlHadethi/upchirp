@@ -332,7 +332,9 @@ const MAX_MESSAGES = 200;
 function bubble(kind: string, text: string): HTMLDivElement {
   const div = document.createElement("div");
   div.className = `msg ${kind}`;
-  div.textContent = text; // plain text only: answers may echo untrusted data
+  // plain text only: answers may echo untrusted data. Bold markers some models add anyway
+  // are dropped rather than shown as asterisks.
+  div.textContent = kind.startsWith("agent") ? text.replace(/\*\*(.+?)\*\*/g, "$1") : text;
   log.append(div);
   while (log.childElementCount > MAX_MESSAGES) log.firstElementChild?.remove();
   log.scrollTop = log.scrollHeight;
