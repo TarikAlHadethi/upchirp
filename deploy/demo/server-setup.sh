@@ -4,6 +4,8 @@
 set -euo pipefail
 BUCKET="$1"
 REGION="${2:-eu-north-1}"
+PROVIDER="${3:-anthropic}"          # or bedrock (decision 0015)
+KEY_PARAM="${4:-/upchirp/anthropic-api-key}"
 APP=/opt/upchirp
 COMPOSE_VERSION=v5.6.0
 COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
@@ -36,7 +38,14 @@ if [ ! -f /etc/upchirp-db-password ]; then
   head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' > /etc/upchirp-db-password
   chmod 600 /etc/upchirp-db-password
 fi
-printf 'DB_PASSWORD=%s\nAWS_REGION=%s\n' "$(cat /etc/upchirp-db-password)" "$REGION" > "$ENV_FILE"
+umask 077  # the env file holds the database password and maybe the API key: root only
+printf 'DB_PASSWORD=%s\nAWS_REGION=%s\nMODEL_PROVIDER=%s\n' \
+  "$(cat /etc/upchirp-db-password)" "$REGION" "$PROVIDER" > "$ENV_FILE"
+if [ "$PROVIDER" = anthropic ]; then
+  # read with the server's role at deploy time; never stored in the repo or the release
+  printf 'ANTHROPIC_API_KEY=%s\n' "$(aws ssm get-parameter --region "$REGION" \
+    --name "$KEY_PARAM" --with-decryption --query Parameter.Value --output text)" >> "$ENV_FILE"
+fi
 chmod 600 "$ENV_FILE"
 
 cd "$APP/deploy/demo"

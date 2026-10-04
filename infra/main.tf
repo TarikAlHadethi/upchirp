@@ -1,6 +1,8 @@
 # Step 6: the public demo. One small ARM server in Stockholm running the platform in replay
 # mode, a private bucket for releases, least-privilege roles, and a monthly budget alarm.
-# No SSH and no keys: the server is reached through SSM, and calls Bedrock with its role.
+# No SSH: the server is reached through SSM. The model is Bedrock with the server's role,
+# or, until Bedrock quota is granted, the Anthropic API with a key the role reads from
+# Parameter Store at deploy time (decision 0015). No key is in the repo or Terraform state.
 
 terraform {
   required_version = ">= 1.9"
@@ -126,14 +128,25 @@ data "aws_iam_policy_document" "demo" {
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.main.arn}/releases/*"]
   }
-  statement {
-    sid     = "InvokeOneModel"
-    actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-    resources = [
-      "arn:aws:bedrock:${var.region}:${local.account}:inference-profile/${var.bedrock_model}",
-      # an EU inference profile routes to the model in any EU region
-      "arn:aws:bedrock:eu-*::foundation-model/${replace(var.bedrock_model, "eu.", "")}",
-    ]
+  dynamic "statement" {
+    for_each = var.model_provider == "bedrock" ? [1] : []
+    content {
+      sid     = "InvokeOneModel"
+      actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
+      resources = [
+        "arn:aws:bedrock:${var.region}:${local.account}:inference-profile/${var.bedrock_model}",
+        # an EU inference profile routes to the model in any EU region
+        "arn:aws:bedrock:eu-*::foundation-model/${replace(var.bedrock_model, "eu.", "")}",
+      ]
+    }
+  }
+  dynamic "statement" {
+    for_each = var.model_provider == "anthropic" ? [1] : []
+    content {
+      sid       = "ReadOneKey"
+      actions   = ["ssm:GetParameter"]
+      resources = ["arn:aws:ssm:${var.region}:${local.account}:parameter${var.anthropic_key_parameter}"]
+    }
   }
 }
 
@@ -211,7 +224,7 @@ resource "aws_instance" "demo" {
       aws s3 cp --region ${var.region} s3://${local.bucket}/releases/server-setup.sh /root/server-setup.sh && break
       sleep 10
     done
-    bash /root/server-setup.sh ${local.bucket} ${var.region} > /var/log/upchirp-setup.log 2>&1
+    bash /root/server-setup.sh ${local.bucket} ${var.region} ${var.model_provider} ${var.anthropic_key_parameter} > /var/log/upchirp-setup.log 2>&1
   EOT
 
   user_data_replace_on_change = false

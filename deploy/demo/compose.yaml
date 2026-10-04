@@ -42,7 +42,8 @@ services:
       db: {condition: service_healthy}
     environment:
       UPCHIRP_PUBLIC: "1"
-      UPCHIRP_MODEL: bedrock
+      UPCHIRP_MODEL: ${MODEL_PROVIDER:-anthropic}  # decision 0015
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       UPCHIRP_BEDROCK_MODEL: ${BEDROCK_MODEL:-eu.anthropic.claude-opus-5-5}
       AWS_REGION: ${AWS_REGION:-eu-north-1}
       UPCHIRP_DAILY_CAP_USD: ${DAILY_CAP_USD:-1.0}

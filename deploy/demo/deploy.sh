@@ -7,6 +7,8 @@ REGION=eu-north-1
 AWS=(aws --profile upchirp --region "$REGION")
 BUCKET=$(terraform -chdir=infra output -raw bucket)
 INSTANCE=$(terraform -chdir=infra output -raw instance_id)
+PROVIDER=$(terraform -chdir=infra output -raw model_provider)
+KEY_PARAM=$(terraform -chdir=infra output -raw anthropic_key_parameter)
 
 git archive --format=tar.gz -o "${TMPDIR:-/tmp}/upchirp.tar.gz" HEAD
 "${AWS[@]}" s3 cp "${TMPDIR:-/tmp}/upchirp.tar.gz" "s3://$BUCKET/releases/upchirp.tar.gz"
@@ -15,7 +17,7 @@ git archive --format=tar.gz -o "${TMPDIR:-/tmp}/upchirp.tar.gz" HEAD
 if [ "${1:-}" = "--upload-only" ]; then exit 0; fi
 CMD=$("${AWS[@]}" ssm send-command --instance-ids "$INSTANCE" --document-name AWS-RunShellScript \
   --comment "upchirp deploy" --query Command.CommandId --output text \
-  --parameters "commands=[\"aws s3 cp --region $REGION s3://$BUCKET/releases/server-setup.sh /root/server-setup.sh\",\"bash /root/server-setup.sh $BUCKET $REGION > /var/log/upchirp-deploy.log 2>&1\"]")
+  --parameters "commands=[\"aws s3 cp --region $REGION s3://$BUCKET/releases/server-setup.sh /root/server-setup.sh\",\"bash /root/server-setup.sh $BUCKET $REGION $PROVIDER $KEY_PARAM > /var/log/upchirp-deploy.log 2>&1\"]")
 echo "Deploying (command $CMD); image builds take several minutes..."
 while :; do
   STATUS=$("${AWS[@]}" ssm get-command-invocation --command-id "$CMD" --instance-id "$INSTANCE" \
