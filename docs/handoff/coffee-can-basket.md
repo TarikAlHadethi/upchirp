@@ -41,7 +41,7 @@ Subtotal about CAD 120 to 160.
 
 | Item | Model | Price | Where | 5.8 GHz? |
 | --- | --- | --- | --- | --- |
-| Spectrum analyser | tinySA Ultra+ ZS407 | about CAD 400 | Amazon.ca, Seeesii or AURSINC (both on the tinysa.org list) | yes, to 7.3 GHz |
+| Spectrum analyser | tinySA Ultra+ ZS407 | about CAD 400 | Amazon.ca, Seesii or AURSINC (both on the tinysa.org list) | yes, to 7.3 GHz |
 | Network analyser | LiteVNA-64 | CAD 205 to 286 | Amazon.ca (official seller: check) | yes, to 6.3 GHz |
 
 Skip the NanoVNA-H4: it stops at 1.5 GHz.
