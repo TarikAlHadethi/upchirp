@@ -9,6 +9,8 @@ KEY_PARAM="${4:-/upchirp/anthropic-api-key}"
 APP=/opt/upchirp
 COMPOSE_VERSION=v5.6.0
 COMPOSE_SHA256=733ec76717ceb59052a9609b9dadfb523b2df8eab57a54212872d10a58078ea2
+BUILDX_VERSION=v0.37.2
+BUILDX_SHA256=efa38cb7aa7db2dbb9ad049b00b0a9737f66f033626177b5a4e845184ad7ab29
 
 if ! command -v docker >/dev/null; then
   dnf install -y docker
@@ -23,6 +25,15 @@ if ! command -v docker >/dev/null; then
     dd if=/dev/zero of=/swapfile bs=1M count=2048 && chmod 600 /swapfile
     mkswap /swapfile && swapon /swapfile && echo "/swapfile none swap sw 0 0" >> /etc/fstab
   fi
+fi
+
+# Compose builds need buildx 0.17 or later, newer than Amazon Linux's docker package has
+if ! docker buildx version 2>/dev/null | grep -q "$BUILDX_VERSION"; then
+  mkdir -p /usr/libexec/docker/cli-plugins
+  curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-buildx \
+    "https://github.com/docker/buildx/releases/download/$BUILDX_VERSION/buildx-$BUILDX_VERSION.linux-arm64"
+  echo "$BUILDX_SHA256  /usr/libexec/docker/cli-plugins/docker-buildx" | sha256sum -c -
+  chmod +x /usr/libexec/docker/cli-plugins/docker-buildx
 fi
 
 # unpack into a fresh folder, then swap it in, so files deleted in the repo are gone here too
