@@ -6,6 +6,8 @@ An offline sensor data platform with an AI agent. A custom 5.8 GHz FMCW radar is
 
 ![Live view: tracks on a top-down map, the range and speed picture, and the agent answering a question](docs/media/live-view.gif)
 
+> **Live demo:** http://ec2-16-192-213-219.eu-north-1.compute.amazonaws.com (a simulated courtyard, read-only, a few questions a day per visitor)
+>
 > Status: the software runs end to end on simulated and recorded data; the radar hardware is being built. Progress: [`docs/progress.md`](docs/progress.md).
 
 ## What it does
