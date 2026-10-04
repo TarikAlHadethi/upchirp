@@ -36,7 +36,7 @@ Update this file at the end of every working session.
 
 ## Open items
 
-- [ ] Exact Xilinx board model, and whether it runs PYNQ
+- [ ] Exact Xilinx board model, and whether it runs PYNQ. Known (4 October): Abdullah can use a board at his university lab, but cannot take it home; decide by week 11 whether integration and the final demo happen at the lab or on a board of the same family bought for it
 - [ ] University lab access for noise figure and phase noise
 - [ ] AWS account and budget alarm
 - [x] Repo home: github.com/TarikAlHadethi/upchirp (public)
