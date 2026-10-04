@@ -72,13 +72,28 @@ GROUNDING_NUDGE = (
 SETTINGS_WORDS = ("chirp", "setting", "config", "frequency", "bandwidth", "reconfigure")
 
 
+def text_of(message: BaseMessage) -> str:
+    """The visible text of a message. Hosted Claude models answer in content blocks
+    (thinking, then text); only the text blocks are the answer, never the thinking."""
+    content = message.content
+    if isinstance(content, str):
+        return content
+    parts = []
+    for block in content:
+        if isinstance(block, str):
+            parts.append(block)
+        elif isinstance(block, dict) and block.get("type") == "text":
+            parts.append(str(block.get("text", "")))
+    return "".join(parts)
+
+
 def user_asked_for_settings_change(messages: Sequence[BaseMessage]) -> bool:
     """Destructive tools may run only when the user's own question asks for a change.
 
     Instructions found in tool results (documents, notes) never count, whoever they
     claim to come from."""
     humans = [m for m in messages if isinstance(m, HumanMessage) and m.content != GROUNDING_NUDGE]
-    question = str(humans[-1].content).lower() if humans else ""
+    question = text_of(humans[-1]).lower() if humans else ""
     return any(w in question for w in SETTINGS_WORDS)
 
 
@@ -91,7 +106,7 @@ def needs_grounding(messages: Sequence[BaseMessage]) -> bool:
     if not humans or messages[humans[-1]].content == GROUNDING_NUDGE:
         return False
     turn = messages[humans[-1] + 1:]
-    answer = str(turn[-1].content).lower() if turn else ""
+    answer = text_of(turn[-1]).lower() if turn else ""
     if not any(w in answer for w in TRACK_WORDS):
         return False
     return not any(isinstance(m, ToolMessage) and m.name in TRACK_TOOLS for m in turn)
@@ -187,7 +202,7 @@ def build_graph(
 
     def ground(state: MessagesState) -> dict[str, list[BaseMessage]]:
         _audit(data_dir, {"guard": "grounding",
-                          "rejected_answer": str(state["messages"][-1].content)[:500]})
+                          "rejected_answer": text_of(state["messages"][-1])[:500]})
         return {"messages": [HumanMessage(GROUNDING_NUDGE)]}
 
     def approve(state: MessagesState) -> Command[str]:
@@ -277,7 +292,7 @@ class Agent:
             return {"thread_id": thread_id, "status": "needs_approval",
                     "tool_calls": pending[0].value["tool_calls"]}
         messages: list[BaseMessage] = state["messages"]
-        answer = str(messages[-1].content)
+        answer = text_of(messages[-1])
         _audit(self.data_dir, {"answer": answer[:1000]})
         return {"thread_id": thread_id, "status": "answered", "answer": answer,
                 "messages": messages}

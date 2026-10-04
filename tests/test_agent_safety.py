@@ -147,3 +147,15 @@ def test_session_ids_are_plain_names(tmp_path: Path, session: str) -> None:
     with pytest.raises(FileNotFoundError) as e:
         resolve_session(tmp_path, session)
     assert str(tmp_path) not in str(e.value)
+
+
+def test_answer_text_leaves_out_thinking_blocks() -> None:
+    """Hosted Claude answers in blocks; the user sees only the text, never the thinking."""
+    from upchirp.agent.graph import text_of
+
+    msg = AIMessage(content=[
+        {"type": "thinking", "thinking": "private reasoning", "signature": "abc"},
+        {"type": "text", "text": "1 person and 1 car so far."},
+    ])
+    assert text_of(msg) == "1 person and 1 car so far."
+    assert text_of(AIMessage(content="plain")) == "plain"
