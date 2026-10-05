@@ -1,6 +1,6 @@
 # Upchirp: project plan
 
-Started Saturday 3 October 2026. Abdullah's schedule runs in weeks from Monday 5 October, because fabrication and shipping set it. Tarik's half is an ordered list with no dates (see CLAUDE.md and docs/progress.md).
+Started Saturday 3 October 2026. Abdullah's schedule runs in weeks from Monday 5 October, because fabrication and shipping set it. Tarik's half is an ordered list with no dates (see docs/development.md and docs/progress.md).
 
 ## What it is
 
@@ -17,7 +17,7 @@ An offline sensor data platform with an AI agent. A 5.8 GHz FMCW radar with angl
 
 ## Tarik: software and platform
 
-Built for outside users, through the install test and a public demo link. The ten steps and their "done when" lines are in CLAUDE.md.
+Built for outside users, through the install test and a public demo link. The ten steps and their "done when" lines are in docs/development.md.
 
 Alongside: three posts (after steps 3, 7, 8), allowlisted tools and an audit log, a Slack or Telegram webhook, a decision record per tool choice. Stretch: fine-tune the local model on the agent's own tool calls.
 

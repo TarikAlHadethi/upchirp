@@ -17,8 +17,6 @@ mlruns/
 *.h5
 *.npz
 
-# Per-person Claude Code settings (who you are: UPCHIRP_OWNER)
-.claude/settings.local.json
 
 # Secrets
 .env
