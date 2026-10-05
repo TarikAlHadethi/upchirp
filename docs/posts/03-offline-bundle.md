@@ -10,11 +10,11 @@ I tested it on a fresh Ubuntu machine with no route to the internet. The first a
 
 Hosted vs local, same eval:
 
-| | Local (Qwen2.5 7B, CPU) | Hosted (Claude) |
+| | Local (Qwen2.5 7B, CPU) | Hosted (Claude Opus 5.5) |
 | --- | --- | --- |
-| Correct | 10 of 10 | (to measure) |
-| Latency p95 | 16.2 s | (to measure) |
-| Cost per answer | $0 | (to measure) |
+| Correct | 10 of 10 | 10 of 10 |
+| Latency p95 | 16.2 s | 16.7 s (p50 9.3 s) |
+| Cost per answer | $0 | $0.020 |
 
 Lesson: test the offline path offline. "It works on my machine" usually means "it works with my machine's internet".
 

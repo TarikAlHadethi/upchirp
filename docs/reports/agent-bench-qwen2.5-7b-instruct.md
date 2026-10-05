@@ -16,7 +16,17 @@
 
 ## Hosted comparison
 
-Not measured yet: it needs a hosted model (`UPCHIRP_MODEL=anthropic upchirp bench` with an API key, or Bedrock once the account's quota allows it). As a rough estimate only: if Claude Opus 5.5 used the same token counts, one answer would cost about (1897 x $4 + 68 x $20) / 1,000,000 = $0.0089, so about 111 answers per dollar. Real token counts differ between models, so measure before relying on this.
+Measured on 5 October 2026 with the same question and scenes (`agent-bench-claude-opus-5-5.md`):
+
+| | Local (Qwen2.5 7B, this PC) | Hosted (Claude Opus 5.5, demo server) |
+| --- | --- | --- |
+| Correct | 10 of 10 | 10 of 10 |
+| Latency p50 | 15.5 s | 9.3 s |
+| Latency p95 | 16.2 s | 16.7 s |
+| Tokens in / out per answer | 1897 / 68 | 3060 / 393 |
+| Cost per answer | $0 | $0.0201 |
+
+Both answer correctly. The hosted model is faster on a typical answer and costs about 2 cents; the local one needs no network and costs nothing per answer.
 
 Raw samples:
 
