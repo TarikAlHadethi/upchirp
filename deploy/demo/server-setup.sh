@@ -62,3 +62,4 @@ chmod 600 "$ENV_FILE"
 cd "$APP/deploy/demo"
 docker compose up -d --build --remove-orphans
 docker image prune -f
+docker builder prune -f  # build cache from earlier deploys

@@ -87,3 +87,17 @@ def test_writer_crash_loses_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
         row = conn.execute("SELECT count(*) AS n FROM detections WHERE run_id = %s",
                            (run_id,)).fetchone()
     assert row is not None and row["n"] == n
+
+
+def test_topics_keep_frames_minutes_not_hours(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raw frames are about 9 GB an hour: they must not be kept for hours (it filled the
+    demo server's disk). Limits also reach topics created before them."""
+    from confluent_kafka.admin import AdminClient, ConfigResource, ResourceType
+
+    monkeypatch.setenv("UPCHIRP_TOPIC_PREFIX", f"test-{uuid.uuid4().hex[:6]}.")
+    stream.ensure_topics()
+    admin = AdminClient({"bootstrap.servers": stream.bootstrap()})
+    res = ConfigResource(ResourceType.TOPIC, stream.topic(stream.FRAMES))
+    cfg = next(iter(admin.describe_configs([res]).values())).result()
+    assert int(cfg["retention.ms"].value) <= 15 * 60_000
+    assert 0 < int(cfg["retention.bytes"].value) <= 2_000_000_000

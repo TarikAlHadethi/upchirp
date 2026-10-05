@@ -108,6 +108,14 @@ def connect_waiting(timeout_s: float = 120) -> psycopg.Connection[dict[str, Any]
 
 def init_schema(conn: psycopg.Connection[Any]) -> None:
     conn.execute(SCHEMA)
+    # A box that runs for weeks (the public demo) keeps only recent detections and tracks,
+    # so the database cannot fill the disk. Unset keeps everything (the edge box).
+    days = os.environ.get("UPCHIRP_DB_RETENTION_DAYS")
+    if days:
+        for table in ("detections", "tracks"):
+            conn.execute(
+                f"SELECT add_retention_policy('{table}', INTERVAL '{int(days)} days', "
+                "if_not_exists => true)")
 
 
 def ts(ns: int) -> datetime:

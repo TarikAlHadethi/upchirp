@@ -111,8 +111,23 @@ def rows(items: list[Any]) -> list[dict[str, Any]]:
     return [asdict(i) for i in items]
 
 
+# How long each topic keeps data. Raw frames are about 2.6 MB a second (9 GB an hour) and
+# nothing reads them after processing, so they and the range-Doppler pictures keep minutes;
+# detections and tracks are small and keep hours. A size cap per topic backs up the time.
+# Six hours of frames for every topic filled the demo server's 30 GB disk.
+RETENTION = {
+    FRAMES: {"retention.ms": str(10 * 60_000), "retention.bytes": str(1_000_000_000),
+             "segment.ms": str(5 * 60_000)},
+    RDMAPS: {"retention.ms": str(10 * 60_000), "retention.bytes": str(200_000_000),
+             "segment.ms": str(5 * 60_000)},
+    DETECTIONS: {"retention.ms": str(6 * 3600_000), "retention.bytes": str(500_000_000)},
+    TRACKS: {"retention.ms": str(6 * 3600_000), "retention.bytes": str(500_000_000)},
+}
+
+
 def ensure_topics(wait_s: float = 120) -> None:
-    """Create the topics if they are missing (Redpanda auto-creates too, this sets sizes).
+    """Create the topics if they are missing, and set their retention (also on topics
+    that already exist, so older installs get the limits too).
 
     Waits up to wait_s for the broker, which may start after the services do."""
     from confluent_kafka.admin import AdminClient, NewTopic  # type: ignore[attr-defined]
@@ -128,7 +143,7 @@ def ensure_topics(wait_s: float = 120) -> None:
                 raise
             time.sleep(3)
     new = [NewTopic(topic(t), num_partitions=1, replication_factor=1,
-                    config={"max.message.bytes": "4000000", "retention.ms": str(6 * 3600_000)})
+                    config={"max.message.bytes": "4000000", **RETENTION.get(t, {})})
            for t in ALL_TOPICS if topic(t) not in existing]
     for future in admin.create_topics(new).values() if new else []:
         try:
@@ -136,3 +151,25 @@ def ensure_topics(wait_s: float = 120) -> None:
         except KafkaException as e:  # another service created it first
             if e.args[0].code() != KafkaError.TOPIC_ALREADY_EXISTS:
                 raise
+    _set_retention(admin, existing)
+
+
+def _set_retention(admin: Any, existing: set[str]) -> None:
+    """Apply RETENTION to topics created before these limits existed."""
+    from confluent_kafka.admin import (  # type: ignore[attr-defined]
+        AlterConfigOpType,
+        ConfigEntry,
+        ConfigResource,
+        ResourceType,
+    )
+
+    resources = [
+        ConfigResource(ResourceType.TOPIC, topic(t), incremental_configs=[
+            ConfigEntry(k, v, incremental_operation=AlterConfigOpType.SET)
+            for k, v in cfg.items()])
+        for t, cfg in RETENTION.items() if topic(t) in existing]
+    for future in admin.incremental_alter_configs(resources).values() if resources else []:
+        try:
+            future.result()
+        except KafkaException:
+            pass  # a broker that refuses keeps its defaults; the size cap is best effort
