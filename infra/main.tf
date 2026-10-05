@@ -234,3 +234,10 @@ resource "aws_instance" "demo" {
     ignore_changes = [ami] # a newer AMI should not replace a running demo
   }
 }
+
+# A fixed public address, so the demo link survives a stop, start or replaced server
+resource "aws_eip" "demo" {
+  instance = aws_instance.demo.id
+  domain   = "vpc"
+  tags     = { Name = "upchirp-demo" }
+}

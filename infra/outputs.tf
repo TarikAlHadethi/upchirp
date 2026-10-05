@@ -1,5 +1,5 @@
 output "demo_url" {
-  value = "http://${aws_instance.demo.public_dns}"
+  value = "http://${aws_eip.demo.public_dns}"
 }
 
 output "instance_id" {
