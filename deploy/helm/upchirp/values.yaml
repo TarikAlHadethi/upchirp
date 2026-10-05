@@ -38,6 +38,10 @@ resources:
   prometheus: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
   grafana: {requests: {cpu: 50m, memory: 128Mi}, limits: {memory: 512Mi}}
 
+# Days of detections and tracks the database keeps. A busy scene writes about 1.2 GB a
+# day, so 5 days fit the 10 Gi volume with room to spare (measured 5 October 2026).
+dbRetentionDays: 5
+
 storage:
   db: 10Gi
   redpanda: 5Gi

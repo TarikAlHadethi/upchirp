@@ -45,6 +45,8 @@ Open them in a browser on the same computer or on any computer on the same netwo
 | Chat says something went wrong | Ask again in a minute; the AI model may still be loading after a restart. |
 | Pages do not open at all | Check the computer is on and on the same network. Then ask an engineer to run `sudo k3s kubectl get pods -n upchirp`. |
 
+**How much it keeps.** The last 5 days of tracks and detections, so the disk never fills. Raw radar frames are kept for 10 minutes only.
+
 **Turning it off.** Shut the computer down normally. Upchirp starts again on its own when the computer starts.
 
 ## For engineers

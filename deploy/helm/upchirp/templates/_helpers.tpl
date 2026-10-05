@@ -22,6 +22,8 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
   value: postgresql://upchirp:$(DB_PASSWORD)@db:5432/upchirp
 - name: UPCHIRP_DATA_DIR
   value: /data
+- name: UPCHIRP_DB_RETENTION_DAYS
+  value: {{ .Values.dbRetentionDays | quote }}
 - name: OLLAMA_HOST
   value: http://ollama:11434
 - name: UPCHIRP_MODEL
