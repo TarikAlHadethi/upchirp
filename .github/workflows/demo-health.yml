@@ -1,0 +1,18 @@
+name: demo health
+
+# Every 6 hours, check the public demo answers. A failed run emails the repo owner, so an
+# outage (such as the full disk on 5 October 2026) is noticed within hours, not days.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Health and data endpoints answer
+        run: |
+          URL=http://ec2-51-21-241-160.eu-north-1.compute.amazonaws.com
+          curl -fsS -m 20 "$URL/api/health" | tee /dev/stderr | grep -q '"ok":true'
+          curl -fsS -m 20 -o /dev/null "$URL/api/summary"
