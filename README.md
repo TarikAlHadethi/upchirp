@@ -1,4 +1,9 @@
-# Upchirp
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-on-dark.svg">
+    <img src="docs/brand/logo-on-light.svg" alt="upchirp" height="64">
+  </picture>
+</h1>
 
 [![ci](https://github.com/TarikAlHadethi/upchirp/actions/workflows/ci.yml/badge.svg)](https://github.com/TarikAlHadethi/upchirp/actions/workflows/ci.yml)
 

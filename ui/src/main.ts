@@ -36,7 +36,7 @@ const COLORS: Record<Label, string> = {
   person: "#60a5fa",
   car: "#f59e0b",
   drone_like: "#f43f5e",
-  unknown: "#94a3b8",
+  unknown: "#a3b1a0",
 };
 const LABEL_TEXT: Record<Label, string> = {
   person: "person",
@@ -89,8 +89,8 @@ function drawMap(): void {
   const px = (x: number, y: number): [number, number] => [ox + x * scale, oy - y * scale];
 
   // field of view and range rings
-  ctx.strokeStyle = "#1e2b3a";
-  ctx.fillStyle = "#7d90a5"; // readable on the dark map (contrast above 4.5:1)
+  ctx.strokeStyle = "#20362a";
+  ctx.fillStyle = "#93ab8f"; // readable on the dark map (contrast above 4.5:1)
   ctx.font = "11px system-ui";
   ctx.lineWidth = 1;
   // Ring labels sit on the right-hand baseline, where targets rarely are, not on the
@@ -121,7 +121,7 @@ function drawMap(): void {
     ctx.lineTo(x, y);
     ctx.stroke();
   }
-  ctx.fillStyle = "#38bdf8";
+  ctx.fillStyle = "#e3ad4b"; // the radar, in the brand's ochre
   ctx.beginPath();
   ctx.arc(ox, oy, 5, 0, 2 * Math.PI);
   ctx.fill();
@@ -146,7 +146,7 @@ function drawMap(): void {
     ctx.beginPath();
     ctx.arc(a, b, t.label === "car" ? 7 : 5.5, 0, 2 * Math.PI);
     ctx.fill();
-    ctx.fillStyle = "#dbe6f0";
+    ctx.fillStyle = "#eaefd1";
     const text = `${t.track_id} ${LABEL_TEXT[t.label] ?? ""}`;
     const tw = ctx.measureText(text).width;
     let ly = b + 4;
@@ -162,13 +162,14 @@ function drawMap(): void {
 const LUT = buildLut();
 
 function buildLut(): Uint8ClampedArray {
-  // dark blue -> teal -> yellow -> white, readable on a dark page
+  // brand ramp: near-black green -> field green -> moss -> ochre -> cream, brightness rising
+  // steadily so a stronger echo always reads brighter
   const stops: Array<[number, [number, number, number]]> = [
-    [0, [7, 11, 16]],
-    [0.35, [14, 60, 110]],
-    [0.6, [20, 150, 160]],
-    [0.85, [250, 210, 70]],
-    [1, [255, 255, 255]],
+    [0, [8, 17, 11]],
+    [0.35, [25, 59, 34]],
+    [0.6, [73, 110, 74]],
+    [0.85, [227, 173, 75]],
+    [1, [241, 245, 222]],
   ];
   const lut = new Uint8ClampedArray(256 * 3);
   for (let i = 0; i < 256; i++) {
@@ -239,7 +240,7 @@ function drawRd(msg: RdMessage, bytes: Uint8Array): void {
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(off, 0, 0, w, h);
 
-  ctx.fillStyle = "rgba(219,230,240,0.8)";
+  ctx.fillStyle = "rgba(234,239,209,0.85)";
   ctx.font = "11px system-ui";
   for (let m = 20; m < cols * msg.range_bin_m; m += 20) {
     ctx.fillText(`${m}`, (m / msg.range_bin_m / cols) * w + 2, h - 4);
