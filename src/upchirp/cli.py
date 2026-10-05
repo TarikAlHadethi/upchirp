@@ -288,8 +288,12 @@ def api(
 
 
 @app.command()
-def bench(runs: Annotated[int, typer.Option(min=1, help="Answers per scene")] = 5) -> None:
-    """Measure the agent's latency, tokens, cost and correctness; write docs/reports/."""
+def bench(
+    runs: Annotated[int, typer.Option(min=1, help="Answers per scene")] = 5,
+    out_dir: Annotated[Path | None, typer.Option(
+        help="Folder for the report (default: docs/reports in the repo)")] = None,
+) -> None:
+    """Measure the agent's latency, tokens, cost and correctness; write a report."""
     import tempfile
 
     from upchirp.agent import bench as agent_bench
@@ -298,12 +302,16 @@ def bench(runs: Annotated[int, typer.Option(min=1, help="Answers per scene")] = 
     with tempfile.TemporaryDirectory() as tmp:
         samples = agent_bench.run(Path(tmp), runs)
     text = agent_bench.report(samples, model)
+    typer.echo(text)  # printed first: answers cost money, so a failed write must not lose them
     safe = "".join(c if c.isalnum() or c in ".-_" else "-" for c in model)
-    out = Path(__file__).resolve().parents[2] / "docs" / "reports" / f"agent-bench-{safe}.md"
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text, encoding="utf-8")
-    typer.echo(text.split("Raw samples")[0])
-    typer.echo(f"Written to {out}")
+    folder = out_dir or Path(__file__).resolve().parents[2] / "docs" / "reports"
+    out = folder / f"agent-bench-{safe}.md"
+    try:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(text, encoding="utf-8")
+        typer.echo(f"Written to {out}")
+    except OSError as e:
+        typer.echo(f"Could not write {out} ({e}); the report is printed above.", err=True)
 
 
 @app.command()
