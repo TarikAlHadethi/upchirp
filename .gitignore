@@ -32,6 +32,8 @@ mlruns/
 .terraform/
 *.tfstate
 *.tfstate.*
+# plan files can hold secrets and resolved values
+*tfplan*
 
 # Node
 node_modules/
