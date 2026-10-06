@@ -16,4 +16,4 @@ What fixed it was not a better prompt. It was code:
 
 The model will take the bait sometimes. The system around it decides whether that matters.
 
-Threat model and the evals that test each control: (link)
+Threat model and the evals that test each control: https://github.com/TarikAlHadethi/upchirp/blob/main/docs/threat-model.md

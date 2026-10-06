@@ -16,6 +16,7 @@ Three things I learned:
 2. Prove the check can fail. An eval that has never caught a planted fault is a guess.
 3. Small models fill in blanks badly. My local 7B model sent an empty string as the session id; the tools now treat that as "latest". The audit log showed it in one line.
 
-The agent runs offline on a 7B model on a CPU: 10 of 10 correct on the benchmark, about 16 seconds an answer, no network.
+The agent runs offline on a 7B model on a CPU: 10 of 10 correct on the benchmark, about 16 seconds an answer, no network. On Claude it is also 10 of 10, in about 9 seconds, for 2 cents an answer.
 
-Repo: (link)
+Repo: https://github.com/TarikAlHadethi/upchirp
+Live demo: http://ec2-51-21-241-160.eu-north-1.compute.amazonaws.com

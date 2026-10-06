@@ -18,4 +18,4 @@ Hosted vs local, same eval:
 
 Lesson: test the offline path offline. "It works on my machine" usually means "it works with my machine's internet".
 
-Install guide: (link)
+Install guide: https://github.com/TarikAlHadethi/upchirp/blob/main/docs/install.md
