@@ -160,6 +160,7 @@ def set_chirp_config(settings: ChirpConfigRequest) -> dict[str, Any]:
     Only call this when the user explicitly asks for a settings change.
     """
     path = data_dir() / PENDING_CHIRP_FILE
+    path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(settings.model_dump(), indent=2))
     return {"status": "queued", "file": str(path),
             "note": "Applied by the hardware adapter on its next start (step 10)."}

@@ -144,6 +144,15 @@ def test_chirp_sweep_ending_outside_the_band_is_rejected() -> None:
                               chirp_duration_s=1e-3, n_chirps=64, reason="test")
 
 
+def test_settings_change_is_queued_in_a_new_data_folder(tmp_path: Path,
+                                                        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("UPCHIRP_DATA_DIR", str(tmp_path / "not-there-yet"))
+    settings = server.ChirpConfigRequest(f_start_hz=5.75e9, bandwidth_hz=100e6,
+                                         chirp_duration_s=1e-3, n_chirps=64, reason="test")
+    assert server.set_chirp_config(settings=settings)["status"] == "queued"
+    assert (tmp_path / "not-there-yet" / server.PENDING_CHIRP_FILE).exists()
+
+
 def test_settings_change_not_requested_by_user_is_blocked(tmp_path: Path) -> None:
     asked: list[Any] = []
     answer, _ = asyncio.run(ask("how many drone-like tracks were there?", tmp_path,
