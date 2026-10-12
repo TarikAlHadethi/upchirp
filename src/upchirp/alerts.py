@@ -21,7 +21,7 @@ from typing import Any
 
 import httpx
 
-from upchirp import stream
+from upchirp import metrics, stream
 
 log = logging.getLogger("upchirp.alerts")
 Send = Callable[[str], None]
@@ -78,8 +78,10 @@ class AlertWatcher:
             key = (msg["run_id"], track["track_id"])
             if not track["confirmed"] or track["label"] != "drone_like" or key in self.alerted:
                 continue
-            self.alerted.add(key)
             text = describe(track, msg["timestamp_ns"])
+            # only once the message exists: a track whose message could not be built can
+            # still alert on a later frame. A failed send is not retried (no alert storm).
+            self.alerted.add(key)
             try:
                 self.send(text)
                 sent.append(text)
@@ -93,7 +95,8 @@ class AlertWatcher:
         try:
             return self.handle(json.loads(value))
         except (ValueError, KeyError, TypeError, AttributeError) as e:
-            log.warning("skipped an unreadable message: %s", type(e).__name__)
+            metrics.BAD_MESSAGES.labels("alerts").inc()
+            log.warning("skipped an unreadable message: %s", e)
             return []
 
 

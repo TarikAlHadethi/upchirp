@@ -50,6 +50,21 @@ def test_unreadable_message_does_not_stop_the_watcher(value: bytes) -> None:
     assert len(w.handle_raw(json.dumps(_msg("r1", [_track(3, "drone_like")])).encode())) == 1
 
 
+def test_track_with_a_bad_message_still_alerts_later(caplog: pytest.LogCaptureFixture) -> None:
+    from upchirp import metrics
+
+    sent: list[str] = []
+    w = alerts.AlertWatcher(sent.append)
+    skipped = metrics.BAD_MESSAGES.labels("alerts")._value.get()
+    broken = {**_track(3, "drone_like"), "azimuth_deg": None}  # a NaN is null on the topic
+    assert w.handle_raw(json.dumps(_msg("r1", [broken])).encode()) == []
+    assert ("r1", 3) not in w.alerted  # no alert went out, so the track is not done
+    assert metrics.BAD_MESSAGES.labels("alerts")._value.get() == skipped + 1
+    assert "skipped an unreadable message" in caplog.text and "NoneType" in caplog.text
+    assert len(w.handle_raw(json.dumps(_msg("r1", [_track(3, "drone_like")])).encode())) == 1
+    assert len(sent) == 1
+
+
 def test_channel_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     for var in ("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SLACK_WEBHOOK_URL"):
         monkeypatch.delenv(var, raising=False)
