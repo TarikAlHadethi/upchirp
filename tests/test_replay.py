@@ -90,3 +90,9 @@ def test_source_explains_a_missing_recording_or_scene(tmp_path: Path,
 def test_vectors_explains_a_frame_past_the_end(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["vectors", "--frame", "5000", "--out", str(tmp_path)])
     assert result.exit_code == 2 and "120 frames" in result.output
+
+
+def test_vectors_refuses_a_negative_frame(tmp_path: Path) -> None:
+    result = CliRunner().invoke(app, ["vectors", "--frame", "-1", "--out", str(tmp_path)])
+    assert result.exit_code == 2 and "--frame" in result.output
+    assert not any(tmp_path.iterdir())  # nothing written
