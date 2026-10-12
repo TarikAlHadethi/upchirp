@@ -73,6 +73,23 @@ def test_decision_needs_a_waiting_question(tmp_path: Path) -> None:
     assert [e["approval"] for e in _audit(tmp_path) if "approval" in e] == ["denied"]
 
 
+def test_two_first_questions_at_once_share_one_agent(tmp_path: Path) -> None:
+    """Both arrive before the tools are loaded. Each must still be there for its decision."""
+    from upchirp.agent.graph import Agent
+
+    async def run() -> None:
+        agent = Agent(tmp_path, model=ScriptedModel(
+            responses=[CHIRP_CALL, CHIRP_CALL, AIMessage("done"), AIMessage("done")]))
+        turns = await asyncio.gather(agent.start("change the chirp"),
+                                     agent.start("change the chirp settings"))
+        for turn in turns:
+            assert turn["status"] == "needs_approval"
+            assert (await agent.resume(turn["thread_id"], False))["status"] == "answered"
+
+    asyncio.run(run())
+    assert [e["approval"] for e in _audit(tmp_path) if "approval" in e] == ["denied", "denied"]
+
+
 def test_read_tools_need_no_approval(tmp_path: Path) -> None:
     call = AIMessage("", tool_calls=[{"name": "list_sessions", "id": "c", "args": {}}])
     asked: list[Any] = []

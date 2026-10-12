@@ -13,6 +13,7 @@ API, needs a key) or "bedrock" (Claude on Amazon Bedrock with the machine's AWS
 role, no key on the box; used by the public demo).
 """
 
+import asyncio
 import json
 import os
 import sys
@@ -276,12 +277,14 @@ class Agent:
         self.model = model
         self.tool_filter = tool_filter
         self.graph: Any = None
+        self._loading = asyncio.Lock()
 
     async def _ensure(self) -> Any:
-        if self.graph is None:
-            tools = await mcp_client(self.data_dir, self.public).get_tools()
-            self.graph = build_graph(self.model or make_model(), tools, self.data_dir,
-                                     self.tool_filter, self.public)
+        async with self._loading:  # questions that arrive while the tools load share one graph
+            if self.graph is None:
+                tools = await mcp_client(self.data_dir, self.public).get_tools()
+                self.graph = build_graph(self.model or make_model(), tools, self.data_dir,
+                                         self.tool_filter, self.public)
         return self.graph
 
     async def _run(self, payload: Any, thread_id: str) -> dict[str, Any]:
