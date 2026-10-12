@@ -118,6 +118,8 @@ def test_packet_with_other_channel_count_is_rejected() -> None:
     stray = encode_packets(np.zeros((4, CHIRP.n_chirps, CHIRP.n_samples), np.complex64), 7)
     assert r.feed(stray[-1]) is None  # rx 3 of 4: would not fit, must not crash
     assert r.bad_packets == 1
+
+
 def test_overlapping_packets_do_not_complete_a_frame_with_holes() -> None:
     chirp = ChirpConfig(id="tiny", n_chirps=2, n_samples=8)
 
