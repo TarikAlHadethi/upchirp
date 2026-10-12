@@ -39,6 +39,13 @@ def test_wire_rejects_garbage() -> None:
         from_wire(b"nope" + bytes(20))
 
 
+@pytest.mark.parametrize("header", [b"[]", b"null", b'"text"', b'{"data": "x"}'])
+def test_wire_header_that_is_not_frame_fields_is_a_value_error(header: bytes) -> None:
+    # the processor skips ValueErrors; anything else would stop the stream
+    with pytest.raises(ValueError):
+        from_wire(b"UPF0" + len(header).to_bytes(4, "big") + header)
+
+
 def test_rdmap_message_is_8_bit_and_sized() -> None:
     power = np.full((64, 256), 1.0)
     power[32, 20] = 1e6  # +60 dB over the floor

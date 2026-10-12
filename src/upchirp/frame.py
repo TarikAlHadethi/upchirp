@@ -70,4 +70,6 @@ def from_wire(buf: bytes) -> Frame:
         raise ValueError("not an Upchirp frame message")
     n = int.from_bytes(buf[4:8], "big")
     header = json.loads(buf[8 : 8 + n])
+    if not isinstance(header, dict) or "data" in header:
+        raise ValueError("not an Upchirp frame message")
     return Frame(**header, data=buf[8 + n :])
