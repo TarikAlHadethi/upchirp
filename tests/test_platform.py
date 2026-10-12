@@ -105,6 +105,11 @@ def test_api_errors_are_clean(client: TestClient) -> None:
     assert client.post("/api/ask", json={"question": ""}).status_code == 422
 
 
+def test_decision_for_an_unknown_thread_is_not_found(client: TestClient) -> None:
+    pytest.importorskip("langgraph")
+    assert client.post("/api/ask/nope/decision", json={"approve": True}).status_code == 404
+
+
 def test_public_guard_limits() -> None:
     from upchirp.api.guard import Limited, PublicGuard
 

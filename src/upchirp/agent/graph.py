@@ -303,6 +303,10 @@ class Agent:
         return await self._run({"messages": [HumanMessage(question)]}, uuid.uuid4().hex)
 
     async def resume(self, thread_id: str, approved: bool) -> dict[str, Any]:
+        graph = await self._ensure()
+        state = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+        if not state.next:  # an unknown thread, or one that already has its answer
+            raise FileNotFoundError("no question is waiting for a decision")
         return await self._run(Command(resume="yes" if approved else "no"), thread_id)
 
 

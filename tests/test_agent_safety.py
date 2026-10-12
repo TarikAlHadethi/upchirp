@@ -54,6 +54,25 @@ def test_destructive_tool_waits_for_a_human(tmp_path: Path, approve: bool) -> No
     assert answer == "done"
 
 
+def test_decision_needs_a_waiting_question(tmp_path: Path) -> None:
+    """A decision for an unknown thread, or a second one for the same thread, must not
+    start the model on an empty conversation."""
+    from upchirp.agent.graph import Agent
+
+    async def run() -> None:
+        agent = Agent(tmp_path, model=_script(CHIRP_CALL))
+        with pytest.raises(FileNotFoundError):
+            await agent.resume("no-such-thread", True)
+        turn = await agent.start("change the chirp")
+        assert turn["status"] == "needs_approval"
+        assert (await agent.resume(turn["thread_id"], False))["answer"] == "done"
+        with pytest.raises(FileNotFoundError):
+            await agent.resume(turn["thread_id"], True)  # a double click
+
+    asyncio.run(run())
+    assert [e["approval"] for e in _audit(tmp_path) if "approval" in e] == ["denied"]
+
+
 def test_read_tools_need_no_approval(tmp_path: Path) -> None:
     call = AIMessage("", tool_calls=[{"name": "list_sessions", "id": "c", "args": {}}])
     asked: list[Any] = []

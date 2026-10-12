@@ -203,7 +203,10 @@ def create_app(data_dir: Path, live: bool = True, public: bool | None = None) ->
     async def decide(thread_id: str, d: Decision) -> dict[str, Any]:
         if public:
             raise HTTPException(403, "Nothing to approve on the public demo.")
-        return _turn(await agent().resume(thread_id, d.approve))
+        try:
+            return _turn(await agent().resume(thread_id, d.approve))
+        except FileNotFoundError as e:
+            raise HTTPException(404, str(e)) from None
 
     # Public demo: cap live viewers in total and per address, so nobody can tie the
     # server up by opening connections. The edge box has no caps (its users are trusted).
