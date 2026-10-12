@@ -15,6 +15,7 @@ agent only has read tools, so there is nothing to approve.
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import threading
 import uuid
@@ -36,6 +37,7 @@ UI_DIST = Path(os.environ.get("UPCHIRP_UI_DIST",
 # What the live view draws. Detections are left out: the page does not show them, and they
 # were a third of the messages sent to every browser.
 LIVE_TOPICS = [stream.TRACKS, stream.RDMAPS]
+log = logging.getLogger(__name__)
 
 
 class Broadcaster:
@@ -69,8 +71,9 @@ class Broadcaster:
                 topic, value = item
                 try:
                     text = json.dumps({"type": topic, **json.loads(value)})
-                except (ValueError, TypeError):  # one bad message must not end the live view
+                except (ValueError, TypeError) as e:  # one bad message must not end the live view
                     metrics.BAD_MESSAGES.labels("api").inc()
+                    log.warning("skipped an unreadable message: %s", e)
                     continue
                 self.loop.call_soon_threadsafe(self._fan_out, text)
         except Exception:  # broker gone: the REST API keeps working without live data

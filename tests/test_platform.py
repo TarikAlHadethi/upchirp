@@ -154,7 +154,8 @@ def test_public_api_refuses_approvals(tmp_path: Path, monkeypatch: pytest.Monkey
     assert app.post("/api/ask/x/decision", json={"approve": True}).status_code == 403
 
 
-def test_live_feed_survives_an_unreadable_message(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_live_feed_survives_an_unreadable_message(monkeypatch: pytest.MonkeyPatch,
+                                                  caplog: pytest.LogCaptureFixture) -> None:
     from collections.abc import Iterator
 
     from upchirp.api.app import Broadcaster
@@ -186,6 +187,7 @@ def test_live_feed_survives_an_unreadable_message(monkeypatch: pytest.MonkeyPatc
     b.loop = loop  # type: ignore[assignment]
     b._run()
     assert [json.loads(t) for t in loop.sent] == [{"type": "tracks", "run_id": "r"}]
+    assert caplog.text.count("skipped an unreadable message") == 2
 
 
 def test_public_live_view_caps_viewers_per_address(tmp_path: Path,
