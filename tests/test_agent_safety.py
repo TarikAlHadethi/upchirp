@@ -99,6 +99,15 @@ def test_chirp_config_outside_the_band_is_rejected() -> None:
                                   chirp_duration_s=1e-3, n_chirps=64, reason="x")
 
 
+def test_chirp_sweep_ending_outside_the_band_is_rejected() -> None:
+    """A start frequency inside the band is not enough: start plus bandwidth must be too."""
+    with pytest.raises(ValueError):
+        server.ChirpConfigRequest(f_start_hz=5.85e9, bandwidth_hz=150e6,
+                                  chirp_duration_s=1e-3, n_chirps=64, reason="test")
+    server.ChirpConfigRequest(f_start_hz=5.725e9, bandwidth_hz=150e6,  # the whole band
+                              chirp_duration_s=1e-3, n_chirps=64, reason="test")
+
+
 def test_settings_change_not_requested_by_user_is_blocked(tmp_path: Path) -> None:
     asked: list[Any] = []
     answer, _ = asyncio.run(ask("how many drone-like tracks were there?", tmp_path,

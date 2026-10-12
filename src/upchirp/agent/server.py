@@ -15,11 +15,11 @@ import os
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from upchirp.agent import data
 
@@ -87,6 +87,12 @@ class ChirpConfigRequest(BaseModel):
     chirp_duration_s: float = Field(ge=1e-4, le=1e-2)
     n_chirps: int = Field(ge=16, le=256)
     reason: str = Field(min_length=3, description="Why the change is wanted")
+
+    @model_validator(mode="after")
+    def _sweep_ends_in_band(self) -> Self:
+        if self.f_start_hz + self.bandwidth_hz > 5.875e9:
+            raise ValueError("the sweep would end above 5.875 GHz")
+        return self
 
 
 @audited
