@@ -89,6 +89,31 @@ def test_writer_crash_loses_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     assert row is not None and row["n"] == n
 
 
+def test_writer_skips_a_message_with_broken_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rows with missing fields must not stop the writer: it would read the same message
+    again after every restart and never get past it."""
+    monkeypatch.setenv("UPCHIRP_DATABASE_URL", DB)
+    monkeypatch.setenv("UPCHIRP_TOPIC_PREFIX", f"test-{uuid.uuid4().hex[:6]}.")
+    stream.ensure_topics()
+    run_id = f"broken-{uuid.uuid4().hex[:6]}"
+    head = {"run_id": run_id, "session_id": run_id, "source": "sim", "frame_index": 0,
+            "timestamp_ns": time.time_ns()}
+    det = {"timestamp_ns": time.time_ns(), "frame_index": 0, "range_m": 10.0,
+           "radial_velocity_mps": 1.0, "azimuth_deg": 0.0, "snr_db": 20.0}
+    prod = stream.producer()
+    prod.produce(stream.topic(stream.TRACKS), stream.encode({**head, "tracks": [{"track_id": 1}]}))
+    prod.produce(stream.topic(stream.DETECTIONS), stream.encode({**head, "detections": [5]}))
+    prod.produce(stream.topic(stream.DETECTIONS), stream.encode({**head, "detections": [det]}))
+    prod.flush(10)
+
+    services.run_writer(from_start=True, max_idle_s=5)
+
+    with store.connect() as conn:
+        row = conn.execute("SELECT count(*) AS n FROM detections WHERE run_id = %s",
+                           (run_id,)).fetchone()
+    assert row is not None and row["n"] == 1
+
+
 def test_topics_keep_frames_minutes_not_hours(monkeypatch: pytest.MonkeyPatch) -> None:
     """Raw frames are about 9 GB an hour: they must not be kept for hours (it filled the
     demo server's disk). Limits also reach topics created before them."""

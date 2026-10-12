@@ -49,6 +49,12 @@ def chirp_config_for(frame: Frame) -> ChirpConfig:
         return cfg.chirp_config(float(khz.removesuffix("k")) * 1e3)
     raise ValueError(f"unknown chirp config '{frame.chirp_config_id}'")
 RDMAP_DYNAMIC_RANGE_DB = 60.0
+# What the writer needs in every row of a message; a message without them is skipped
+ROW_FIELDS = {
+    stream.DETECTIONS: ("timestamp_ns", "frame_index", "range_m", "radial_velocity_mps",
+                        "azimuth_deg", "snr_db"),
+    stream.TRACKS: ("timestamp_ns", *store.TRACK_COLUMNS),
+}
 
 
 def run_source(frames: Iterable[Frame], label: str = "source") -> int:
@@ -200,6 +206,12 @@ def run_writer(from_start: bool = False, max_idle_s: float | None = None) -> Non
                           "detections" if item[0] == stream.DETECTIONS else "tracks")
                 if not isinstance(msg, dict) or any(k not in msg for k in needed):
                     raise ValueError("missing fields")
+                fields = ROW_FIELDS[item[0]]
+                rows = msg[needed[-1]]
+                if not isinstance(rows, list) or any(
+                        not isinstance(r, dict) or any(k not in r for k in fields)
+                        for r in rows):
+                    raise ValueError("rows with missing fields")
             except ValueError as e:  # json errors are ValueErrors too
                 metrics.BAD_MESSAGES.labels("writer").inc()
                 log.warning("skipped an unreadable message: %s", e)
