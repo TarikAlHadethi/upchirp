@@ -157,6 +157,8 @@ def track_summaries(
     time window."""
     if label is not None and label not in LABELS:
         raise ValueError(f"label must be one of {', '.join(LABELS)}")
+    if last_minutes is not None and not last_minutes > 0:
+        raise ValueError("last_minutes must be greater than 0")
     session_id, start_ns, states = load_tracks(data_dir, session)
     end_ns = max((s.timestamp_ns for s in states), default=start_ns)
     from_ns = start_ns if last_minutes is None else max(start_ns, end_ns - last_minutes * 60e9)

@@ -45,6 +45,13 @@ def test_unknown_label_rejected(processed: tuple[Path, Path]) -> None:
         data.track_summaries(processed[0], label="ufo")
 
 
+@pytest.mark.parametrize("minutes", [-5.0, 0.0, float("nan")])
+def test_time_window_must_be_positive(processed: tuple[Path, Path], minutes: float) -> None:
+    """A window that ends before it starts holds no tracks, which reads as "nothing seen"."""
+    with pytest.raises(ValueError, match="last_minutes"):
+        data.track_summaries(processed[0], last_minutes=minutes)
+
+
 def test_unprocessed_session_says_so(tmp_path: Path) -> None:
     scene = default_scene().model_copy(update={"duration_s": 0.2})
     record_simulation(Simulator(scene, session_id="raw", start_ns=0), tmp_path)
