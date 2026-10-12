@@ -354,9 +354,13 @@ def import_wav(
 
     cfg = CoffeeCanConfig(f_start_hz=start_mhz * 1e6, bandwidth_hz=bandwidth_mhz * 1e6,
                           sweep_s=sweep_ms / 1e3)
-    start_ns = int(path.stat().st_mtime * 1e9)
     session_id = f"can-{path.stem}-{datetime.now(UTC):%Y%m%dT%H%M%S}Z"
-    src = SoundcardSource(path, session_id, start_ns, cfg)
+    try:
+        start_ns = int(path.stat().st_mtime * 1e9)
+        src = SoundcardSource(path, session_id, start_ns, cfg)
+    except (FileNotFoundError, ValueError) as e:  # no such file, or not a stereo WAV
+        typer.echo(str(e), err=True)
+        raise typer.Exit(code=1) from None
     session_dir = record_frames(src.frames(), data_dir, session_id, "soundcard", start_ns,
                                 src.chirp, ArrayConfig(n_rx=1), notes,
                                 {"recording": path.name, "coffee_can": cfg.__dict__})

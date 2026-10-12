@@ -54,6 +54,16 @@ def test_import_wav_then_replay(tmp_path: Path) -> None:
     assert summary["frames"] == 6
 
 
+def test_import_wav_explains_a_file_it_cannot_use(tmp_path: Path) -> None:
+    mono = tmp_path / "mono.wav"
+    wavfile.write(mono, 48_000, np.zeros(4800, dtype=np.int16))
+    for path, words in ((mono, "stereo"), (tmp_path / "missing.wav", "missing.wav")):
+        result = CliRunner().invoke(app, ["import-wav", str(path), "--data-dir", str(tmp_path)])
+        assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
+        assert words in result.output
+    assert not (tmp_path / "sessions").exists()
+
+
 def test_processor_rebuilds_the_exact_chirp_config() -> None:
     from upchirp.services import chirp_config_for
     from upchirp.sources.soundcard import CoffeeCanConfig
