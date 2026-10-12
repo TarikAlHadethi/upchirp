@@ -330,7 +330,7 @@ def vectors(
     real_input: Annotated[bool, typer.Option(help="Real ADC samples only (Q is zero)")] = False,
     bit_reversed: Annotated[bool, typer.Option(help="Expected output in bit-reversed order")]
     = False,
-    frame: Annotated[int, typer.Option(help="Which frame of the default scene")] = 40,
+    frame: Annotated[int, typer.Option(min=0, help="Which frame of the default scene")] = 40,
 ) -> None:
     """Write range-FFT test vectors for the FPGA (see src/upchirp/dsp/vectors.py)."""
     from upchirp.dsp import vectors as vec
@@ -340,7 +340,11 @@ def vectors(
     sim = Simulator(get_scene("default"), session_id="vectors", start_ns=0, seed=0)
     from itertools import islice
 
-    chosen, _ = next(islice(sim.run(), frame, None))
+    picked = next(islice(sim.run(), frame, None), None)
+    if picked is None:
+        raise typer.BadParameter(f"the default scene has {sim.scene.n_frames} frames",
+                                 param_hint="--frame")
+    chosen, _ = picked
     data = vec.make_vectors(chosen.cube()[0], cfg)
     vec.write(out, data, cfg, {"scene": "default", "frame": frame, "seed": 0, "rx": 0})
     typer.echo(f"Wrote {data['input_iq'].shape[0]} chirps x {cfg.n_samples} samples to {out}")
