@@ -37,6 +37,18 @@ def test_static_target_range(range_m: float) -> None:
     assert d == doppler_bin_of(CHIRP, 0.0)
 
 
+def test_radial_velocity_with_idle_time_between_chirps() -> None:
+    """Chirps repeat every chirp_interval_s, so that sets the Doppler, not the sweep time."""
+    chirp = ChirpConfig(id="idle", chirp_interval_s=2e-3)
+    target = Target(id="a", label="car", position_m=(0.0, 40.0, 0.0),
+                    velocity_mps=(0.0, 3.0, 0.0), rcs_m2=10.0)
+    scene = Scene(name="test", duration_s=0.2, frame_period_s=0.2, targets=(target,))
+    frame, _ = next(Simulator(scene, session_id="t", start_ns=0, chirp=chirp, seed=1).run())
+    power = (np.abs(range_doppler(frame.cube())) ** 2).sum(axis=0)
+    d, _ = np.unravel_index(int(np.argmax(power)), power.shape)
+    assert int(d) == doppler_bin_of(chirp, 3.0)
+
+
 @pytest.mark.parametrize("velocity", [-8.0, -2.0, 1.5, 6.0])
 def test_radial_velocity(velocity: float) -> None:
     target = Target(id="a", label="car", position_m=(0.0, 40.0, 0.0),

@@ -140,7 +140,7 @@ class Simulator:
         c = self.chirp
         shape = (self.array.n_rx, c.n_chirps, c.n_samples)
         fast_time = np.arange(c.n_samples) / c.sample_rate_hz
-        chirp_starts = np.arange(c.n_chirps) * c.chirp_duration_s
+        chirp_starts = np.arange(c.n_chirps) * c.repeat_s
         rx_index = np.arange(self.array.n_rx)
 
         def add_return(cube: npt.NDArray[np.complex128], ranges: npt.NDArray[np.float64],
