@@ -87,6 +87,15 @@ class AlertWatcher:
                 log.error("alert not sent: %s", _safe(e))
         return sent
 
+    def handle_raw(self, value: bytes) -> list[str]:
+        """handle() for a message straight off the topic. One that cannot be read is logged
+        and skipped, as in the other stream services."""
+        try:
+            return self.handle(json.loads(value))
+        except (ValueError, KeyError, TypeError, AttributeError) as e:
+            log.warning("skipped an unreadable message: %s", type(e).__name__)
+            return []
+
 
 def run_alerts() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
@@ -99,6 +108,6 @@ def run_alerts() -> None:
     try:
         for item in stream.messages(cons):
             if item is not None:
-                watcher.handle(json.loads(item[1]))
+                watcher.handle_raw(item[1])
     finally:
         cons.close()

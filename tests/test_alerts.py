@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pytest
@@ -33,6 +34,20 @@ def test_send_failure_does_not_stop_the_watcher() -> None:
     w = alerts.AlertWatcher(broken)
     assert w.handle(_msg("r1", [_track(3, "drone_like")])) == []
     assert ("r1", 3) in w.alerted  # not retried in a loop
+
+
+@pytest.mark.parametrize("value", [
+    b"not json",
+    b"[1, 2]",
+    b'{"tracks": [{"track_id": 1, "confirmed": true, "label": "drone_like"}]}',  # no run_id
+    b'{"run_id": "r", "timestamp_ns": 0, "tracks": [{"track_id": 1, "confirmed": true, '
+    b'"label": "drone_like", "range_m": null, "azimuth_deg": null, "speed_mps": null}]}',
+])
+def test_unreadable_message_does_not_stop_the_watcher(value: bytes) -> None:
+    sent: list[str] = []
+    w = alerts.AlertWatcher(sent.append)
+    assert w.handle_raw(value) == []
+    assert len(w.handle_raw(json.dumps(_msg("r1", [_track(3, "drone_like")])).encode())) == 1
 
 
 def test_channel_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
