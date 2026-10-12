@@ -67,7 +67,11 @@ class Broadcaster:
                 if item is None or self.loop is None:
                     continue
                 topic, value = item
-                text = json.dumps({"type": topic, **json.loads(value)})
+                try:
+                    text = json.dumps({"type": topic, **json.loads(value)})
+                except (ValueError, TypeError):  # one bad message must not end the live view
+                    metrics.BAD_MESSAGES.labels("api").inc()
+                    continue
                 self.loop.call_soon_threadsafe(self._fan_out, text)
         except Exception:  # broker gone: the REST API keeps working without live data
             return

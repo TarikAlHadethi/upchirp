@@ -149,6 +149,40 @@ def test_public_api_refuses_approvals(tmp_path: Path, monkeypatch: pytest.Monkey
     assert app.post("/api/ask/x/decision", json={"approve": True}).status_code == 403
 
 
+def test_live_feed_survives_an_unreadable_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    from collections.abc import Iterator
+
+    from upchirp.api.app import Broadcaster
+
+    b = Broadcaster()
+
+    class _Consumer:
+        def close(self) -> None:
+            pass
+
+    class _Loop:
+        def __init__(self) -> None:
+            self.sent: list[str] = []
+
+        def call_soon_threadsafe(self, fn: Any, text: str) -> None:
+            self.sent.append(text)
+
+    def messages(cons: Any, timeout_s: float = 0.5) -> Iterator[tuple[str, bytes] | None]:
+        yield "tracks", b"not json"
+        yield "tracks", b"[1, 2]"
+        yield "tracks", b'{"run_id": "r"}'
+        b.stop.set()
+        yield None
+
+    monkeypatch.setattr(stream, "ensure_topics", lambda: None)
+    monkeypatch.setattr(stream, "consumer", lambda group, topics: _Consumer())
+    monkeypatch.setattr(stream, "messages", messages)
+    loop = _Loop()
+    b.loop = loop  # type: ignore[assignment]
+    b._run()
+    assert [json.loads(t) for t in loop.sent] == [{"type": "tracks", "run_id": "r"}]
+
+
 def test_public_live_view_caps_viewers_per_address(tmp_path: Path,
                                                     monkeypatch: pytest.MonkeyPatch) -> None:
     from starlette.websockets import WebSocketDisconnect
