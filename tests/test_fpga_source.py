@@ -118,3 +118,17 @@ def test_packet_with_other_channel_count_is_rejected() -> None:
     stray = encode_packets(np.zeros((4, CHIRP.n_chirps, CHIRP.n_samples), np.complex64), 7)
     assert r.feed(stray[-1]) is None  # rx 3 of 4: would not fit, must not crash
     assert r.bad_packets == 1
+def test_overlapping_packets_do_not_complete_a_frame_with_holes() -> None:
+    chirp = ChirpConfig(id="tiny", n_chirps=2, n_samples=8)
+
+    def packet(chirp_index: int, offset: int, count: int) -> bytes:
+        header = HEADER.pack(b"UPC0", 0, 0, 0, 1, 0, chirp_index, 0, 0, 2, 8, offset, count, 0)
+        return header + np.full(2 * count, 100, "<i2").tobytes()
+
+    r = Reassembler("s", chirp)
+    assert r.feed(packet(0, 0, 6)) is None  # samples 0 to 5 of chirp 0
+    assert r.feed(packet(0, 2, 6)) is None  # samples 2 to 7: overlaps the first
+    assert r.bad_packets == 1
+    # 16 samples have been sent once this arrives, but samples 6 and 7 of chirp 0 are missing
+    assert r.feed(packet(1, 0, 8)) is None
+    assert r.feed(packet(0, 6, 2)) is not None

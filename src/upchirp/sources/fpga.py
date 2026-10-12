@@ -99,6 +99,7 @@ class _Partial:
     first: Packet
     received_ns: int
     cube: npt.NDArray[np.complex64]
+    have: npt.NDArray[np.bool_]  # which samples have arrived
     filled: int = 0
 
 
@@ -142,13 +143,19 @@ class Reassembler:
                 # far behind: the FPGA restarted and counts from 0 again
                 for counter in list(self._open):
                     self._drop(counter)
+            shape = (p.n_rx, p.n_chirps, p.n_samples)
             partial = _Partial(p, received_ns or time.time_ns(),
-                               np.zeros((p.n_rx, p.n_chirps, p.n_samples), np.complex64))
+                               np.zeros(shape, np.complex64), np.zeros(shape, np.bool_))
             self._open[p.frame_counter] = partial
             while len(self._open) > self.max_open:
                 self._drop(min(self._open))
+        cells = (p.rx, p.chirp, slice(p.offset, p.offset + len(p.samples)))
+        if partial.have[cells].any():
+            self.bad_packets += 1  # overlaps samples already here: counting it would hide a hole
+            return None
         self._seen.add(key)
-        partial.cube[p.rx, p.chirp, p.offset:p.offset + len(p.samples)] = p.samples
+        partial.have[cells] = True
+        partial.cube[cells] = p.samples
         partial.filled += len(p.samples)
         if partial.filled < partial.cube.size:
             return None
