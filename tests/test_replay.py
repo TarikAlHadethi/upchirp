@@ -72,3 +72,17 @@ def test_cli_sim_then_replay(tmp_path: Path) -> None:
 def test_cli_unknown_scene(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["sim", "--scene", "mars", "--data-dir", str(tmp_path)])
     assert result.exit_code != 0
+def test_source_explains_a_missing_recording_or_scene(tmp_path: Path,
+                                                      monkeypatch: pytest.MonkeyPatch) -> None:
+    pytest.importorskip("confluent_kafka")
+    from upchirp import stream
+
+    monkeypatch.setattr(stream, "ensure_topics", lambda: None)  # no broker needed to say no
+    result = CliRunner().invoke(app, ["source", "--session", "nope", "--data-dir", str(tmp_path)])
+    assert result.exit_code == 1 and isinstance(result.exception, SystemExit)
+    assert "no session 'nope'" in result.output
+    result = CliRunner().invoke(app, ["source", "--scene", "mars"])
+    assert result.exit_code == 2 and "unknown scene" in result.output
+
+
+

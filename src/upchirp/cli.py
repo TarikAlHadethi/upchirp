@@ -207,12 +207,20 @@ def source(
         return
     while True:
         if scene is not None:
+            try:
+                scene_def = get_scene(scene)
+            except ValueError as e:
+                raise typer.BadParameter(str(e), param_hint="--scene") from None
             now = datetime.now(UTC)
-            sim = Simulator(get_scene(scene), session_id=f"live-{scene}-{now:%Y%m%dT%H%M%S}Z",
+            sim = Simulator(scene_def, session_id=f"live-{scene}-{now:%Y%m%dT%H%M%S}Z",
                             start_ns=time.time_ns(), seed=int(time.time()))
             frames: Iterator[Frame] = SimSource(sim).frames()
         else:
-            frames = ReplaySource(resolve_session(data_dir, session)).frames()
+            try:
+                frames = ReplaySource(resolve_session(data_dir, session)).frames()
+            except FileNotFoundError as e:
+                typer.echo(str(e), err=True)
+                raise typer.Exit(code=1) from None
         n = services.run_source(_paced(frames, realtime))
         typer.echo(f"Published {n} frames")
         if not loop:
