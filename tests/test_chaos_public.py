@@ -133,9 +133,11 @@ class FanOutWorld:
         self.b = Broadcaster()
         self.queues: list[asyncio.Queue[str]] = []
         self.count = 0
+        self.just_sent = False  # the last step was a message
 
     def apply(self, step: Step) -> None:
         name, args = step
+        self.just_sent = name == "message"
         if name == "join":
             q: asyncio.Queue[str] = asyncio.Queue(maxsize=30)
             self.queues.append(q)
@@ -160,17 +162,36 @@ class FanOutWorld:
                 out.append(f"a viewer has {len(waiting)} messages waiting")
             if waiting != sorted(waiting):
                 out.append("a viewer's messages are out of order")
+            if self.just_sent and waiting[-1:] != [self.count]:
+                out.append("a viewer did not get the newest message")
         return out
 
 
-@pytest.mark.parametrize("seed", seeds())
-def test_live_fan_out_keeps_its_rules_under_chaos(seed: int) -> None:
+def _fan_out_steps(seed: int) -> list[Step]:
     rng = random.Random(seed)
     steps: list[Step] = []
     for _ in range(300):
         kind = rng.choice(["message"] * 12 + ["join", "join", "leave", "read", "read"])
         steps.append((kind, (rng.randrange(8), rng.randrange(40))))
-    check(FanOutWorld, steps, seed)
+    return steps
+
+
+@pytest.mark.parametrize("seed", seeds())
+def test_live_fan_out_keeps_its_rules_under_chaos(seed: int) -> None:
+    check(FanOutWorld, _fan_out_steps(seed), seed)
+
+
+def test_fan_out_chaos_catches_a_dropped_newest_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The check itself is checked: a fan-out that keeps a full queue as it is, and so
+    drops the newest message instead of the oldest, must fail the chaos test."""
+    def drops_newest(self: Broadcaster, text: str) -> None:
+        for q in self.clients:
+            if not q.full():
+                q.put_nowait(text)
+
+    monkeypatch.setattr(Broadcaster, "_fan_out", drops_newest)
+    with pytest.raises(AssertionError, match="a viewer did not get the newest message"):
+        check(FanOutWorld, _fan_out_steps(0), 0)
 
 
 class ViewerWorld:
