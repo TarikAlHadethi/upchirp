@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 import pytest
@@ -94,5 +95,7 @@ def test_vectors_explains_a_frame_past_the_end(tmp_path: Path) -> None:
 
 def test_vectors_refuses_a_negative_frame(tmp_path: Path) -> None:
     result = CliRunner().invoke(app, ["vectors", "--frame", "-1", "--out", str(tmp_path)])
-    assert result.exit_code == 2 and "--frame" in result.output
+    # On GitHub Actions the usage error is coloured, which splits "--frame" with colour codes.
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", result.output)
+    assert result.exit_code == 2 and "--frame" in plain
     assert not any(tmp_path.iterdir())  # nothing written
