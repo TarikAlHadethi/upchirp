@@ -80,7 +80,9 @@ class _Track:
 
 def _measurement_cov(det: Detection, cfg: TrackerConfig) -> Array:
     az = np.radians(det.azimuth_deg)
-    r = det.range_m
+    # At range 0 the angle error would span no distance and the matrix could not be
+    # inverted; the position is still unsure by at least the range error in every direction.
+    r = max(det.range_m, cfg.range_std_m)
     jac = np.array([[np.sin(az), r * np.cos(az)], [np.cos(az), -r * np.sin(az)]])
     polar = np.diag([cfg.range_std_m**2, np.radians(cfg.azimuth_std_deg) ** 2])
     cov: Array = jac @ polar @ jac.T

@@ -118,3 +118,16 @@ def test_drone_like_label_needs_ten_detections() -> None:
             assert lab.label(2)[0] == "car"
     lab.observe(1, det(40.0))
     assert lab.label(1)[0] == "drone_like"
+
+
+def test_echo_at_the_radar_twice_at_one_instant_does_not_crash() -> None:
+    # Found by the chaos test: at range 0 the measurement had no width across range, and
+    # with no time between two frames nothing widened the track again (singular matrix).
+    at_radar = Detection(session_id="t", frame_index=0, timestamp_ns=DT_NS, range_m=0.0,
+                         radial_velocity_mps=0.0, azimuth_deg=0.0, snr_db=30.0,
+                         range_bin=0, doppler_bin=32)
+    tracker = Tracker()
+    tracker.step([at_radar], DT_NS)
+    tracker.step([at_radar], DT_NS)
+    (state,) = tracker.states("t", 1)
+    assert state.hits == 2 and np.isfinite(state.range_m)
