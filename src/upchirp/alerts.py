@@ -25,6 +25,9 @@ from upchirp import metrics, stream
 
 log = logging.getLogger("upchirp.alerts")
 Send = Callable[[str], None]
+# Alerted tracks are remembered for the newest runs only. A looping replay starts a new run
+# every loop; only the last few can still have messages on the way.
+REMEMBERED_RUNS = 8
 
 
 def _safe(e: Exception) -> str:
@@ -71,6 +74,7 @@ class AlertWatcher:
     def __init__(self, send: Send) -> None:
         self.send = send
         self.alerted: set[tuple[str, int]] = set()
+        self.runs: list[str] = []  # runs with an alert, oldest first
 
     def handle(self, msg: dict[str, Any]) -> list[str]:
         sent = []
@@ -82,12 +86,21 @@ class AlertWatcher:
             # only once the message exists: a track whose message could not be built can
             # still alert on a later frame. A failed send is not retried (no alert storm).
             self.alerted.add(key)
+            self._forget_old_runs(key[0])
             try:
                 self.send(text)
                 sent.append(text)
             except Exception as e:  # never let a flaky network stop the watcher
                 log.error("alert not sent: %s", _safe(e))
         return sent
+
+    def _forget_old_runs(self, run_id: str) -> None:
+        if run_id in self.runs:
+            return
+        self.runs.append(run_id)
+        if len(self.runs) > REMEMBERED_RUNS:
+            gone = self.runs.pop(0)
+            self.alerted = {key for key in self.alerted if key[0] != gone}
 
     def handle_raw(self, value: bytes) -> list[str]:
         """handle() for a message straight off the topic. One that cannot be read is logged

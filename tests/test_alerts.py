@@ -88,3 +88,17 @@ def test_bot_token_never_reaches_the_log(caplog: pytest.LogCaptureFixture) -> No
 
     alerts.AlertWatcher(send).handle(_msg("r1", [_track(1, "drone_like")]))
     assert "HTTP 401" in caplog.text and "SECRET123" not in caplog.text
+
+
+def test_watcher_forgets_runs_long_gone() -> None:
+    # Found by the chaos test: a looping replay starts a new run every loop, and the
+    # watcher remembered every alerted track of every run for as long as it ran.
+    sent: list[str] = []
+    w = alerts.AlertWatcher(sent.append)
+    for i in range(50):
+        w.handle(_msg(f"r{i}", [_track(3, "drone_like")]))
+    assert len(sent) == 50
+    assert len(w.alerted) == alerts.REMEMBERED_RUNS
+    w.handle(_msg("r49", [_track(3, "drone_like")]))  # the newest runs are still known
+    w.handle(_msg("r48", [_track(3, "drone_like")]))  # a late message of the run before
+    assert len(sent) == 50
