@@ -75,7 +75,8 @@ class GuardWorld:
             except Limited as e:
                 status = e.status
                 kept = sum(1 for t in self.hits.get(visitor, []) if t >= CLOCK.now - 86_400)
-                if self.guard.reserved != held or len(self.guard.hits[visitor]) not in (known, kept):
+                now_known = len(self.guard.hits[visitor])  # old hits may have aged out
+                if self.guard.reserved != held or now_known not in (known, kept):
                     self.problems.append("a refused question changed the guard")
             if status not in expected:
                 self.problems.append(f"question got {status}, the rules allow {sorted(expected)}")
