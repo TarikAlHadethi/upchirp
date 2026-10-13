@@ -73,6 +73,26 @@ def test_decision_needs_a_waiting_question(tmp_path: Path) -> None:
     assert [e["approval"] for e in _audit(tmp_path) if "approval" in e] == ["denied"]
 
 
+def test_two_decisions_at_the_same_instant_run_the_tool_once(tmp_path: Path) -> None:
+    """Found by the chaos test: both decisions saw a waiting question, so both were carried
+    out and an approved settings change ran twice."""
+    from upchirp.agent.graph import Agent
+
+    async def run() -> list[Any]:
+        agent = Agent(tmp_path, model=_script(CHIRP_CALL))
+        turn = await agent.start("change the chirp")
+        return await asyncio.gather(agent.resume(turn["thread_id"], True),
+                                    agent.resume(turn["thread_id"], True),
+                                    return_exceptions=True)
+
+    results = asyncio.run(run())
+    assert sorted(type(r).__name__ for r in results) == ["FileNotFoundError", "dict"]
+    audit = _audit(tmp_path)
+    assert [e["approval"] for e in audit if "approval" in e] == ["approved"]
+    assert sum(e.get("actor") == "mcp" and e.get("tool") == "set_chirp_config"
+               for e in audit) == 1
+
+
 def test_two_first_questions_at_once_share_one_agent(tmp_path: Path) -> None:
     """Both arrive before the tools are loaded. Each must still be there for its decision."""
     from upchirp.agent.graph import Agent

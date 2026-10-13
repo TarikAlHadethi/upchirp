@@ -278,6 +278,7 @@ class Agent:
         self.tool_filter = tool_filter
         self.graph: Any = None
         self._loading = asyncio.Lock()
+        self._deciding: set[str] = set()  # threads with a decision being carried out
 
     async def _ensure(self) -> Any:
         async with self._loading:  # questions that arrive while the tools load share one graph
@@ -306,11 +307,19 @@ class Agent:
         return await self._run({"messages": [HumanMessage(question)]}, uuid.uuid4().hex)
 
     async def resume(self, thread_id: str, approved: bool) -> dict[str, Any]:
-        graph = await self._ensure()
-        state = await graph.aget_state({"configurable": {"thread_id": thread_id}})
-        if not state.next:  # an unknown thread, or one that already has its answer
-            raise FileNotFoundError("no question is waiting for a decision")
-        return await self._run(Command(resume="yes" if approved else "no"), thread_id)
+        # One decision per thread at a time: a second one arriving while the first is still
+        # being carried out would also find the question waiting, and run the tool again.
+        if thread_id in self._deciding:
+            raise FileNotFoundError("a decision for this question is already being carried out")
+        self._deciding.add(thread_id)
+        try:
+            graph = await self._ensure()
+            state = await graph.aget_state({"configurable": {"thread_id": thread_id}})
+            if not state.next:  # an unknown thread, or one that already has its answer
+                raise FileNotFoundError("no question is waiting for a decision")
+            return await self._run(Command(resume="yes" if approved else "no"), thread_id)
+        finally:
+            self._deciding.discard(thread_id)
 
 
 async def ask(
