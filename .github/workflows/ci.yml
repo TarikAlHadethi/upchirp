@@ -21,6 +21,10 @@ jobs:
       - run: ruff check .
       - run: mypy src
       - run: pytest tests
+      # The chaos tests again, with many more random sequences than the 5 each above.
+      - run: pytest tests -k chaos
+        env:
+          UPCHIRP_CHAOS_SEQUENCES: "100"
       # A regression fails the build. Agent evals skip here (no model in CI);
       # run them locally with Ollama up, or with UPCHIRP_MODEL=anthropic and a key.
       - run: pytest evals
