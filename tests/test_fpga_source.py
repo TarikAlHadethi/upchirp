@@ -1,5 +1,6 @@
 """FPGA UDP source (proposed packet layout, docs/fpga-link.md), tested with a fake FPGA."""
 
+import socket
 import threading
 import time
 
@@ -80,10 +81,19 @@ def test_header_is_32_bytes_little_endian() -> None:
     assert MAX_SAMPLES_PER_PACKET == 360
 
 
+def _free_udp_port() -> int:
+    # A fixed port mixes the packets of two test runs that happen at the same time.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        port: int = sock.getsockname()[1]
+        return port
+
+
 def test_fake_fpga_over_udp_gives_frames_the_detector_can_use() -> None:
     sim = Simulator(get_scene("default"), session_id="fpga", start_ns=0, seed=0)
     sent = [f for f, _ in zip((f for f, _ in sim.run()), range(30), strict=False)]
-    src = FpgaSource("fpga-test", CHIRP, host="127.0.0.1", port=49917, idle_timeout_s=2.0)
+    port = _free_udp_port()
+    src = FpgaSource("fpga-test", CHIRP, host="127.0.0.1", port=port, idle_timeout_s=2.0)
     received = []
 
     def listen() -> None:
@@ -92,7 +102,7 @@ def test_fake_fpga_over_udp_gives_frames_the_detector_can_use() -> None:
     t = threading.Thread(target=listen)
     t.start()
     time.sleep(0.3)  # let the listener bind
-    send_frames(iter(sent), port=49917, realtime=True, frame_period_s=0.02)
+    send_frames(iter(sent), port=port, realtime=True, frame_period_s=0.02)
     t.join()
     assert len(received) >= 28  # loopback UDP can, rarely, lose a packet
     det = Detector(CHIRP, ArrayConfig())
