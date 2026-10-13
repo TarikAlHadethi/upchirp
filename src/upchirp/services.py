@@ -109,7 +109,6 @@ class Processor:
         if (self.pipeline is None or frame.session_id != self.session_id
                 or frame.frame_index <= self.last_index):
             self._start_run(frame)
-        self.last_index = frame.frame_index
         assert self.pipeline is not None
         with (self.tracer.start_as_current_span("process_frame") as span,
               metrics.FRAME_SECONDS.time()):
@@ -117,6 +116,7 @@ class Processor:
             span.set_attribute("frame_index", frame.frame_index)
             result = self.pipeline.process(frame)
             span.set_attribute("detections", len(result.detections))
+        self.last_index = frame.frame_index  # only now: a refused frame must not move it
         metrics.FRAMES_PROCESSED.inc()
         metrics.DETECTIONS.inc(len(result.detections))
         metrics.CONFIRMED_TRACKS.set(sum(t.confirmed for t in result.tracks))

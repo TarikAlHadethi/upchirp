@@ -83,6 +83,21 @@ def test_processor_starts_a_new_run_on_replay_loop() -> None:
     assert topics == {stream.topic(t) for t in ("detections", "tracks", "rdmaps")}
 
 
+def test_refused_frame_does_not_end_the_run() -> None:
+    # Found by the chaos test: a frame the processor cannot use still moved its frame
+    # counter on, so the next good frame looked like a replay loop and began a new run.
+    proc = services.Processor()
+    proc.prod = _FakeProducer()  # type: ignore[assignment]
+    frames = _frames(3)
+    proc.handle(frames[0])
+    stray = frames[2].model_copy(update={"chirp_config_id": "nope", "frame_index": 7})
+    with pytest.raises(ValueError):
+        proc.handle(stray)
+    proc.handle(frames[1])
+    runs = [m["run_id"] for t, m in proc.prod.sent if t.endswith("tracks")]  # type: ignore[attr-defined]
+    assert len(runs) == 2 and runs[0] == runs[1]
+
+
 @pytest.fixture
 def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.delenv("UPCHIRP_DATABASE_URL", raising=False)
