@@ -131,3 +131,20 @@ def test_echo_at_the_radar_twice_at_one_instant_does_not_crash() -> None:
     tracker.step([at_radar], DT_NS)
     (state,) = tracker.states("t", 1)
     assert state.hits == 2 and np.isfinite(state.range_m)
+
+
+def test_track_removed_as_a_duplicate_keeps_no_detection() -> None:
+    # Found by the chaos test: after a long gap two tracks took the same echo, seen twice.
+    # One was removed as a duplicate but still held its detection, so the labeler kept
+    # a history for a track that no longer existed.
+    def det(range_m: float, azimuth_deg: float, radial_velocity_mps: float) -> Detection:
+        return Detection(session_id="t", frame_index=0, timestamp_ns=0, range_m=range_m,
+                         radial_velocity_mps=radial_velocity_mps, azimuth_deg=azimuth_deg,
+                         snr_db=70.0, range_bin=0, doppler_bin=32)
+
+    tracker = Tracker()
+    tracker.step([det(29.861, 3.008, 1.114), det(16.978, 14.781, 0.833)], DT_NS)
+    twice = det(30.354, -14.388, -1.85)
+    tracker.step([twice, twice], DT_NS + 3_600_000_000_000)  # an hour later
+    alive = {s.track_id for s in tracker.states("t", 1)}
+    assert set(tracker.associations) <= alive

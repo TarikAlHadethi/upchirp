@@ -172,6 +172,9 @@ class Tracker:
             if t.misses < limit:
                 survivors.append(t)
         self._tracks = self._drop_duplicates(survivors)
+        # a track removed just now took a detection above; it must not keep it
+        alive = {t.id for t in self._tracks}
+        self.associations = {i: d for i, d in self.associations.items() if i in alive}
         # New tracks start from the strongest leftover echo in each spot; weaker echoes
         # near it, or near an existing track, are moving parts of the same object.
         leftovers = sorted((d for j, d in enumerate(detections) if j not in matched_dets),
