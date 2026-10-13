@@ -59,6 +59,11 @@ class OnnxLabeler:
         for track_id, p in zip(ids, self.classify(normalise(patches)), strict=True):
             self._probs[track_id].append(p)
 
+    def keep_only(self, track_ids: set[int]) -> None:
+        """Forget every track that is gone, as RuleLabeler.keep_only does."""
+        for track_id in [i for i in self._probs if i not in track_ids]:
+            del self._probs[track_id]
+
     def label(self, track_id: int) -> tuple[str, float]:
         """(label, mean probability of that label); 'unknown' until enough detections."""
         hist = self._probs.get(track_id)

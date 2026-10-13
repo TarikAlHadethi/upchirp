@@ -61,6 +61,12 @@ class RuleLabeler:
     def observe(self, track_id: int, det: Detection) -> None:
         self._history[track_id].append(rcs_dbsm(det))
 
+    def keep_only(self, track_ids: set[int]) -> None:
+        """Forget every track that is gone. Ids are never used again, so on a long run
+        the history of ended tracks would only pile up."""
+        for track_id in [i for i in self._history if i not in track_ids]:
+            del self._history[track_id]
+
     def label(self, track_id: int) -> tuple[str, float]:
         """(label, median RCS in dBsm) for a track; 'unknown' until enough detections."""
         hist = self._history.get(track_id)

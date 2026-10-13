@@ -57,6 +57,10 @@ class Pipeline:
             if self.classifier is not None:
                 label, _ = self.classifier.label(state.track_id)
             tracks.append(dataclasses.replace(state, label=label, rcs_dbsm=rcs))
+        alive = {t.track_id for t in tracks}
+        self.labeler.keep_only(alive)
+        if self.classifier is not None:
+            self.classifier.keep_only(alive)
         return FrameResult(frame, detections, tracks)
 
     def run(self, frames: Iterable[Frame]) -> Iterator[FrameResult]:
