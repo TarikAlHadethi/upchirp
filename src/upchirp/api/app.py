@@ -27,7 +27,7 @@ from fastapi import FastAPI, HTTPException, Query, Request, WebSocket
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from upchirp import metrics, stream, telemetry
+from upchirp import metrics, stream, telemetry, tripwire
 from upchirp.agent import data
 from upchirp.agent.costs import cost_usd, tokens
 from upchirp.api.guard import Limited, PublicGuard
@@ -249,6 +249,8 @@ def create_app(data_dir: Path, live: bool = True, public: bool | None = None) ->
                 t.cancel()
             broadcaster.clients.discard(q)
             per_address[visitor] -= 1
+            if per_address[visitor] < 0:
+                tripwire.tripped("live-viewer-count", f"count {per_address[visitor]}")
             if per_address[visitor] <= 0:
                 del per_address[visitor]
             metrics.LIVE_CLIENTS.set(len(broadcaster.clients))

@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+from upchirp import tripwire
 from upchirp.config import ChirpConfig
 from upchirp.frame import Frame
 
@@ -149,6 +150,8 @@ class Reassembler:
             self._open[p.frame_counter] = partial
             while len(self._open) > self.max_open:
                 self._drop(min(self._open))
+            if len(self._open) > self.max_open:
+                tripwire.tripped("fpga-open-frames", f"{len(self._open)} open")
         cells = (p.rx, p.chirp, slice(p.offset, p.offset + len(p.samples)))
         if partial.have[cells].any():
             self.bad_packets += 1  # overlaps samples already here: counting it would hide a hole
@@ -164,6 +167,9 @@ class Reassembler:
             self._drop(counter)
         del self._open[p.frame_counter]
         self._forget(p.frame_counter)
+        if not partial.have.all():
+            tripwire.tripped("fpga-frame-complete",
+                             f"{int(partial.have.sum())} of {partial.have.size} samples")
         frame = Frame.from_cube(
             partial.cube, source="fpga", session_id=self.session_id,
             frame_index=self.frames_out, timestamp_ns=partial.received_ns,

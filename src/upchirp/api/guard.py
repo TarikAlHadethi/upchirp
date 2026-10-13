@@ -12,7 +12,7 @@ from collections import defaultdict, deque
 from datetime import UTC, datetime
 from typing import Any
 
-from upchirp import store
+from upchirp import store, tripwire
 
 USAGE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS daily_usage (
@@ -85,6 +85,8 @@ class PublicGuard:
         """Book one answer's real cost and release its reservation. Call exactly once per
         successful check(), also when the answer failed (then with the reservation)."""
         with self.lock:
+            if self.reserved < self.reserve_usd - 1e-9:  # a release with nothing held
+                tripwire.tripped("guard-release-without-hold", f"held {self.reserved:.4f}")
             self.reserved = max(0.0, self.reserved - self.reserve_usd)
         if not self.use_db:
             self.memory[_today()] += cost

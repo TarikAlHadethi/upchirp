@@ -16,6 +16,7 @@ import numpy as np
 import numpy.typing as npt
 from scipy.optimize import linear_sum_assignment
 
+from upchirp import tripwire
 from upchirp.dsp.detect import Detection
 
 Array = npt.NDArray[np.float64]
@@ -207,6 +208,11 @@ class Tracker:
 
     def states(self, session_id: str, frame_index: int) -> list[TrackState]:
         assert self._last_ns is not None, "call step() first"
+        ids = {t.id for t in self._tracks}
+        if len(ids) != len(self._tracks):
+            tripwire.tripped("tracker-unique-ids", f"{len(self._tracks)} tracks, {len(ids)} ids")
+        if not all(np.isfinite(t.x).all() for t in self._tracks):
+            tripwire.tripped("tracker-finite-state", f"{len(self._tracks)} tracks")
         out = []
         for t in self._tracks:
             x, y, vx, vy = (float(v) for v in t.x)

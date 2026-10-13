@@ -15,6 +15,8 @@ import os
 from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
+from upchirp import tripwire
+
 Step = tuple[str, tuple[Any, ...]]
 
 
@@ -35,11 +37,15 @@ def first_failure(make_world: Callable[[], World], steps: Sequence[Step]) -> lis
     breaks any (a step that raises counts as one), or an empty list."""
     world = make_world()
     for i, step in enumerate(steps):
+        tripped = dict(tripwire.COUNTS)
         try:
             world.apply(step)
             broken = world.broken()
         except Exception as e:  # an unexpected error is itself a broken rule; it is reported
             broken = [f"step raised {type(e).__name__}: {e}"]
+        if tripwire.COUNTS != tripped:  # the app's own runtime checks watch every step too
+            fired = sorted(r for r, n in tripwire.COUNTS.items() if n != tripped.get(r, 0))
+            broken.append(f"a runtime tripwire fired: {', '.join(fired)}")
         if broken:
             return [f"after step {i} {step!r}: {b}" for b in broken]
     return []

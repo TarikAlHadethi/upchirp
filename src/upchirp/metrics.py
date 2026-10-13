@@ -21,6 +21,8 @@ ANSWER_SECONDS = Histogram("upchirp_agent_answer_seconds", "Time to answer a que
 BAD_MESSAGES = Counter("upchirp_bad_messages_total", "Stream messages skipped as unreadable",
                        ["service"])
 LIVE_CLIENTS = Gauge("upchirp_live_clients", "Browsers on the live view")
+TRIPWIRES = Counter("upchirp_tripwires_total", "Always-true rules found broken (tripwire.py)",
+                    ["rule"])
 
 
 def serve_from_env() -> None:
