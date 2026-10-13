@@ -2,7 +2,8 @@
 
 Rules (sweep-notes/rules.md, F1 to F7 and W1 to W3):
 - a frame that comes out is exactly one sent frame: no holes, nothing from another frame
-- one frame counter gives at most one frame; frame indexes go 0, 1, 2, ...
+- one frame counter gives at most one frame (a whole frame sent twice still gives two:
+  an expected failure at the end of this file); frame indexes go 0, 1, 2, ...
 - at most `max_open` frames are open, and packet memory covers open frames only
 - bad, duplicate, late and overlapping packets never raise
 - damaged frame messages and packets raise ValueError and nothing else
@@ -41,6 +42,7 @@ class FpgaWorld:
         self.r = Reassembler("chaos", TINY)
         self.frames: list[Frame] = []
         self.sent: set[tuple[int, int]] = set()  # (epoch, counter) with a packet sent
+        self.handed_out: list[tuple[int, int]] = []  # (epoch, counter) of each frame out
         self.problems: list[str] = []
 
     def apply(self, step: Step) -> None:
@@ -67,6 +69,15 @@ class FpgaWorld:
             self.problems.append("frames_out does not match the frames handed out")
         if frame is not None:
             self.frames.append(frame)
+            counter = frame.meta["fpga_frame_counter"]
+            matches = [e for e, c in self.sent if c == counter
+                       and np.abs(frame.cube() - _cube(e, c)).max() < 2 / 32768]
+            if not matches:
+                self.problems.append(f"frame for counter {counter} is not one sent frame")
+            elif (matches[0], counter) in self.handed_out:
+                self.problems.append(f"counter {counter} gave two frames")
+            else:
+                self.handed_out.append((matches[0], counter))
 
     def broken(self) -> list[str]:
         out = list(self.problems)
@@ -77,13 +88,6 @@ class FpgaWorld:
             out.append("packet memory holds a frame that is no longer open")
         if [f.frame_index for f in self.frames] != list(range(len(self.frames))):
             out.append("frame indexes are not 0, 1, 2, ...")
-        if self.frames:
-            f = self.frames[-1]
-            counter = f.meta["fpga_frame_counter"]
-            matches = [e for e, c in self.sent if c == counter
-                       and np.abs(f.cube() - _cube(e, c)).max() < 2 / 32768]
-            if not matches:
-                out.append(f"frame for counter {counter} is not one sent frame")
         return out
 
 
@@ -158,3 +162,14 @@ def test_damaged_wire_messages_raise_value_error_only(seed: int) -> None:
                 read(bytes(buf))
             except ValueError:
                 pass  # the only refusal the stream services skip
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "Known limit, not fixed on purpose: once a frame is handed out the reassembler forgets "
+    "its counter, so a whole frame that arrives a second time (with no newer frame open) "
+    "comes out again. Remembering finished counters interacts with the restart rule, where "
+    "the counter starts from 0 again. To be settled with the FPGA packet layout "
+    "(docs/fpga-link.md), for example with a boot id in the header."))
+def test_saved_sequence_whole_frame_sent_twice_gives_one_frame() -> None:
+    once: list[Step] = [("send", (0, 0, 0, i)) for i in range(len(_packets(0, 0, 0)))]
+    check(FpgaWorld, once + once)
