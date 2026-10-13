@@ -1,6 +1,6 @@
 """Chaos test for recordings on disk and the agent's read queries over them.
 
-Rules (sweep-notes/rules.md, S1 to S5 and Q1 to Q4):
+Rules:
 - a session id exists once; recording to it again is refused and changes nothing
 - frames read back equal the frames written, and the manifest counts them
 - "latest" is the session created last

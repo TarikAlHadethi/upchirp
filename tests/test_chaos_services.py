@@ -1,6 +1,6 @@
 """Chaos tests for the processor (with a fake producer) and the alert watcher.
 
-Rules (sweep-notes/rules.md, P1 to P4 and L1 to L5):
+Rules:
 - a run holds one session and its frame numbers only go up; a run that ended never comes back
 - every processed frame gives one detections and one tracks message with that frame's run id
 - a frame the processor cannot use raises ValueError or KeyError, sends nothing and changes

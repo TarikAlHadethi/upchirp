@@ -1,6 +1,6 @@
 """Chaos test for the FPGA packet reassembler and the two wire formats.
 
-Rules (sweep-notes/rules.md, F1 to F7 and W1 to W3):
+Rules:
 - a frame that comes out is exactly one sent frame: no holes, nothing from another frame
 - one frame counter gives at most one frame (a whole frame sent twice still gives two:
   an expected failure at the end of this file); frame indexes go 0, 1, 2, ...

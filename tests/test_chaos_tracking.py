@@ -1,7 +1,7 @@
 """Chaos test for the tracker and the labels, through the real Pipeline with a scripted
 detector (the DSP in front of it has its own tests and evals).
 
-Rules (sweep-notes/rules.md, K1 to K8):
+Rules:
 - track ids are unique in a frame and never used again
 - a confirmed track never goes back to unconfirmed
 - one detection belongs to at most one track, one track takes at most one detection

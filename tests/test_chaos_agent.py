@@ -1,7 +1,7 @@
 """Chaos test for the agent's approval gate: the real graph and Agent class, with a fake
 model that answers by the question it is given and two fake tools. No model, no MCP server.
 
-Rules (sweep-notes/rules.md, A1 to A7):
+Rules:
 - a destructive tool runs only after a human yes for that same question, once per yes
 - a denied or blocked call never runs
 - a decision for an unknown thread, or a second decision, is refused and runs nothing

@@ -1,7 +1,7 @@
 """Chaos tests for the public demo limits: the question guard, live viewer counts and the
 live fan-out. No database and no model; the guard's clock is a fake one.
 
-Rules (sweep-notes/rules.md, G1 to G7):
+Rules:
 - money held equals questions in flight times the reserve, and is never negative
 - a question gets in only if spent + held + one reserve fits under the daily cap
 - a visitor gets at most `per_minute` questions in 60 seconds and `per_day` in 24 hours
