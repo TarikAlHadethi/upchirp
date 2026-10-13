@@ -4,9 +4,14 @@ on:
   push:
   pull_request:
 
+# The jobs only read the code: no secrets, no deploys.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -22,6 +27,7 @@ jobs:
 
   ui:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: ui
@@ -36,6 +42,7 @@ jobs:
   platform:
     # Redpanda and Postgres from compose.yaml; end-to-end stream test and SQL checks.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -47,6 +54,7 @@ jobs:
 
   helm:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: azure/setup-helm@v4
